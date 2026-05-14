@@ -35,12 +35,50 @@ chabad-pushcoins/
 │       └── AudioEngine.js          # מנוע צלילים (Web Audio API)
 ```
 
+## בניית APK (קובץ התקנה לאנדרואיד)
+
+הבנייה מתבצעת בענן של Expo (EAS Build) — לוקח ~15-25 דקות, ובסיום מקבלים קישור להורדה של ה-APK.
+
+**שלב 1 — חשבון Expo חינמי:**
+
+הירשמו ב-https://expo.dev (חינם).
+
+**שלב 2 — התקנת ה-CLI:**
+
+```bash
+npm install -g eas-cli
+```
+
+**שלב 3 — בנייה:**
+
+```bash
+cd chabad-pushcoins
+npm install
+eas login                           # הזינו את פרטי החשבון שיצרתם
+eas build:configure                 # פעם ראשונה בלבד
+npm run build:apk                   # בונה APK בענן (~20 דק׳)
+```
+
+בסיום, EAS תיתן קישור הורדה. שלחו אותו לטלפון, הורידו והתקינו (יש לאשר "התקנה ממקור לא ידוע").
+
+**לבניית AAB ל-Google Play:**
+
+```bash
+npm run build:aab
+```
+
+**לבניית iOS (דורש חשבון Apple Developer בעלות 99$ לשנה):**
+
+```bash
+npm run build:ios
+```
+
 ## שלבים הבאים
 
-- [ ] להחליף `BIT_PHONE` ב-`HomeScreen.js` אם המספר ישתנה
+- [ ] להחליף את `BIT_PHONE` ב-`PaymentScreen.js` אם המספר ישתנה
 - [ ] כשתיפתח עמותה — להוסיף Cardcom / Tranzila / Stripe לסליקה
-- [ ] להוסיף לוגו מותאם אישית (החלף `assets/icon.png`)
-- [ ] לפרסם ב-App Store ו-Google Play (דרך `eas build`)
+- [ ] להחליף את `assets/icon.png` בלוגו רשמי של בית חב״ד
+- [ ] לפרסם ב-Google Play (דרך `npm run build:aab` + `eas submit`)
 
 ## פרטי Bit
 
