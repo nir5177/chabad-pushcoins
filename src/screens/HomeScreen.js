@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Animated, TouchableOpacity,
-  FlatList, Dimensions, Linking, Alert,
+  FlatList, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -9,11 +9,10 @@ import * as Haptics from 'expo-haptics';
 import Pushke from '../components/Pushke';
 import CoinButton from '../components/CoinButton';
 import AudioEngine from '../components/AudioEngine';
+import PaymentScreen from './PaymentScreen';
 
 /* ── Constants ──────────────────────────────────────────────── */
 const { width: SW } = Dimensions.get('window');
-const BIT_PHONE     = '0508100010';
-const BIT_PHONE_INT = '972508100010';
 
 const COINS = [
   { value: 0.5, label: '½ ₪',  freq: 1380 },
@@ -113,21 +112,12 @@ export default function HomeScreen() {
 
   /* ── Donate ──────────────────────────────────────────────────── */
   const handleDonate = useCallback(() => {
-    if (total === 0) { Alert.alert('לא נבחר סכום', 'לחץ על מטבע תחילה'); return; }
+    if (total === 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowDonate(true);
-  }, [total]);
-
-  const openBit = useCallback(() => {
-    const amount = fmt(total);
-    const msg = `שלום! אני רוצה לתרום ${amount} ₪ לבית חב"ד קרית בורוכוב ותל גנים דרך Bit 🙏`;
-    Linking.canOpenURL('bit://')
-      .then(ok => ok
-        ? Linking.openURL(`bit://pay?phone=${BIT_PHONE}&amount=${amount}`)
-        : Linking.openURL(`whatsapp://send?phone=${BIT_PHONE_INT}&text=${encodeURIComponent(msg)}`)
-      )
-      .catch(() =>
-        Alert.alert('תשלום ידני', `פתח Bit ושלח ${fmt(total)} ₪ למספר:\n📱 ${BIT_PHONE}`)
-      );
   }, [total]);
 
   const reset = useCallback(() => {
@@ -229,50 +219,39 @@ export default function HomeScreen() {
       </View>
 
       {/* ── Total + Donate ── */}
-      {!showDonate ? (
-        <View style={styles.bottomBar}>
-          <View style={styles.totalWrap}>
-            <Text style={styles.totalAmount}>{fmt(total)} ₪</Text>
-            <Text style={styles.totalLabel}>
-              {coinCount === 0 ? 'בחר מטבע' : `${coinCount} מטבע${coinCount === 1 ? '' : 'ות'}`}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.donateBtn, total === 0 && styles.donateBtnOff]}
-            onPress={handleDonate}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.donateBtnText}>
-              {total > 0 ? `תרום ${fmt(total)} ₪` : 'תרום'} 💙
-            </Text>
-          </TouchableOpacity>
+      <View style={styles.bottomBar}>
+        <View style={styles.totalWrap}>
+          <Text style={styles.totalAmount}>{fmt(total)} ₪</Text>
+          <Text style={styles.totalLabel}>
+            {coinCount === 0 ? 'בחר מטבע' : `${coinCount} מטבע${coinCount === 1 ? '' : 'ות'}`}
+          </Text>
         </View>
-      ) : (
-        /* ── Payment card ── */
-        <View style={styles.payCard}>
-          <Text style={styles.payTitle}>תרומה דרך Bit</Text>
-          <Text style={styles.payAmount}>{fmt(total)} ₪</Text>
-          <Text style={styles.payPhone}>📱 {BIT_PHONE}</Text>
-          <TouchableOpacity style={styles.bitBtn} onPress={openBit}>
-            <Text style={styles.bitBtnText}>פתח Bit ושלח</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowDonate(false)}>
-            <Text style={styles.backLink}>← חזור להכנסת מטבעות</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={reset}>
-            <Text style={styles.resetLink}>אפס</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        <TouchableOpacity
+          style={[styles.donateBtn, total === 0 && styles.donateBtnOff]}
+          onPress={handleDonate}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.donateBtnText}>
+            {total > 0 ? `תרום ${fmt(total)} ₪` : 'תרום'} 💙
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Payment Modal ── */}
+      <PaymentScreen
+        visible={showDonate}
+        total={total}
+        coinCount={coinCount}
+        onClose={() => setShowDonate(false)}
+        onReset={reset}
+      />
     </SafeAreaView>
   );
 }
 
 /* ── Styles ──────────────────────────────────────────────────── */
-const BG     = '#eeeaf8'; // light lavender (matches reference)
-const NAVY   = '#0A1628';
+const BG     = '#eeeaf8';
 const INDIGO = '#1e1b8a';
-const GOLD   = '#F59E0B';
 const MUTED  = '#7070a0';
 
 const styles = StyleSheet.create({
@@ -334,23 +313,4 @@ const styles = StyleSheet.create({
   donateBtnOff: { backgroundColor: '#b0b0c8', shadowOpacity: 0 },
   donateBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
 
-  /* Payment card */
-  payCard: {
-    backgroundColor: 'white', margin: 16, borderRadius: 20,
-    padding: 20, alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 }, shadowRadius: 12,
-    elevation: 6,
-  },
-  payTitle:  { fontSize: 16, fontWeight: '700', color: INDIGO, marginBottom: 8 },
-  payAmount: { fontSize: 44, fontWeight: '900', color: GOLD, marginBottom: 4 },
-  payPhone:  { fontSize: 18, color: '#4040b0', fontWeight: '600', marginBottom: 4 },
-  bitBtn: {
-    backgroundColor: '#0070e0', borderRadius: 26,
-    paddingVertical: 13, paddingHorizontal: 40, width: '100%',
-    alignItems: 'center', marginBottom: 10, marginTop: 8,
-  },
-  bitBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
-  backLink:  { color: MUTED, fontSize: 13, marginBottom: 6 },
-  resetLink: { color: '#c0c0d8', fontSize: 11 },
 });
