@@ -1,229 +1,184 @@
-import React, { useRef, useImperativeHandle, forwardRef } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, {
-  Rect, Circle, Path, Text as SvgText, Defs, LinearGradient, Stop,
-  G, Ellipse, Line,
+  Rect, Polygon, Ellipse, Circle, G, Path,
+  Text as SvgText, Defs, LinearGradient, Stop, Filter,
+  FeGaussianBlur, FeMerge, FeMergeNode,
 } from 'react-native-svg';
 
 /**
- * קופת צדקה — Chabad blue metal charity box (pushke).
- * Exposes a `shakeCoin()` method via ref (called when a coin is pressed).
+ * Classic 3D tin charity box (פושקה) viewed from slightly above,
+ * with a glowing coin slot on the top face.
+ * Chabad navy + gold colour scheme.
  */
-const Pushke = forwardRef(function Pushke({ width = 220, height = 300 }, ref) {
-  // No animation ref needed here; parent handles the falling coin
-  useImperativeHandle(ref, () => ({
-    shakeCoin() {/* hook for parent to trigger extra effects if needed */},
-  }));
-
+export default function Pushke({ width = 300, height = 210 }) {
   const W = width;
   const H = height;
 
-  // Box geometry
-  const boxX = W * 0.1;
-  const boxY = H * 0.18;
-  const boxW = W * 0.8;
-  const boxH = H * 0.72;
-  const boxR = 10;
+  // Front face geometry
+  const fL = W * 0.05,   fR = W * 0.95;
+  const fT = H * 0.32,   fB = H * 0.93;
+  const fW = fR - fL,    fH = fB - fT;
 
-  // Slot geometry (coin slot at top-center)
-  const slotW = boxW * 0.3;
-  const slotH = 8;
-  const slotX = boxX + (boxW - slotW) / 2;
-  const slotY = boxY - slotH / 2;
+  // Top face (trapezoid — perspective above)
+  const tL = W * 0.09,   tR = W * 0.91;
+  const tT = H * 0.08;
+  // Top face corners: front-left (fL,fT), front-right (fR,fT), back-right (tR,tT), back-left (tL,tT)
+  const topPts = `${fL},${fT} ${fR},${fT} ${tR},${tT} ${tL},${tT}`;
+
+  // Slot on top face (centered, about 45% of top face width)
+  const slotMidY = (fT + tT) / 2;
+  const topMidLeft  = fL + (tL - fL) * 0.5 + fW * 0.28;
+  const topMidRight = fL + (tL - fL) * 0.5 + fW * 0.72;
+  const slotH = H * 0.034;
+  const slotPts = `${topMidLeft},${slotMidY - slotH / 2} ${topMidRight},${slotMidY - slotH / 2} ${topMidRight + (tR - fR) * 0.12},${slotMidY + slotH / 2} ${topMidLeft + (tL - fL) * 0.12},${slotMidY + slotH / 2}`;
+
+  // Logo circle centre on front face
+  const logoX = W / 2, logoY = fT + fH * 0.38, logoR = fW * 0.15;
 
   return (
-    <View style={[styles.container, { width: W, height: H }]}>
+    <View style={{ width: W, height: H }}>
       <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
         <Defs>
-          {/* Main body gradient — dark Chabad blue */}
-          <LinearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#1a3a8a" stopOpacity="1" />
-            <Stop offset="0.3" stopColor="#1e4db7" stopOpacity="1" />
-            <Stop offset="0.7" stopColor="#1a3fa0" stopOpacity="1" />
-            <Stop offset="1" stopColor="#0f2060" stopOpacity="1" />
+
+          {/* Front face — deep navy with subtle vertical gradient */}
+          <LinearGradient id="pkFront" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0"   stopColor="#1e2a8a" />
+            <Stop offset="0.4" stopColor="#16206e" />
+            <Stop offset="1"   stopColor="#0b1248" />
           </LinearGradient>
-          {/* Top cap gradient */}
-          <LinearGradient id="capGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#2a5ad4" stopOpacity="1" />
-            <Stop offset="1" stopColor="#1230a0" stopOpacity="1" />
+
+          {/* Top face — slightly lighter (catches light) */}
+          <LinearGradient id="pkTop" x1="0" y1="1" x2="0" y2="0">
+            <Stop offset="0"   stopColor="#2a3ab0" />
+            <Stop offset="1"   stopColor="#3848c8" />
           </LinearGradient>
-          {/* Metallic sheen on left edge */}
-          <LinearGradient id="sheenGrad" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#4a7ae8" stopOpacity="0.6" />
-            <Stop offset="1" stopColor="#4a7ae8" stopOpacity="0" />
+
+          {/* Left-side sheen on front face */}
+          <LinearGradient id="pkSheen" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0"   stopColor="#5060e0" stopOpacity="0.35" />
+            <Stop offset="0.5" stopColor="#5060e0" stopOpacity="0" />
           </LinearGradient>
-          {/* Bottom cap */}
-          <LinearGradient id="bottomGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#0f2060" stopOpacity="1" />
-            <Stop offset="1" stopColor="#091540" stopOpacity="1" />
+
+          {/* Slot glow filter */}
+          <Filter id="slotGlow" x="-50%" y="-200%" width="200%" height="500%">
+            <FeGaussianBlur stdDeviation="4" result="blur" />
+            <FeMerge>
+              <FeMergeNode in="blur" />
+              <FeMergeNode in="SourceGraphic" />
+            </FeMerge>
+          </Filter>
+
+          {/* Logo circle gradient */}
+          <LinearGradient id="logoGrad" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0"   stopColor="#1a2880" />
+            <Stop offset="1"   stopColor="#0a1050" />
           </LinearGradient>
-          {/* Slot shadow */}
-          <LinearGradient id="slotGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#000820" stopOpacity="1" />
-            <Stop offset="1" stopColor="#001040" stopOpacity="1" />
+
+          {/* Bottom shadow gradient */}
+          <LinearGradient id="pkBottom" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0"   stopColor="#0a1248" />
+            <Stop offset="1"   stopColor="#060a30" />
           </LinearGradient>
         </Defs>
 
-        {/* ── Shadow under box ── */}
-        <Ellipse
-          cx={W / 2}
-          cy={boxY + boxH + 12}
-          rx={boxW * 0.4}
-          ry={8}
-          fill="#000"
-          opacity={0.35}
+        {/* ── Ground shadow ── */}
+        <Ellipse cx={W / 2} cy={H * 0.98} rx={fW * 0.44} ry={H * 0.022}
+          fill="#000" opacity={0.28} />
+
+        {/* ── Top face ── */}
+        <Polygon points={topPts} fill="url(#pkTop)" />
+
+        {/* Top face edge highlight */}
+        <Polygon
+          points={`${tL},${tT} ${tR},${tT} ${tR + 1},${tT + 2} ${tL - 1},${tT + 2}`}
+          fill="#5a6ae8" opacity={0.6}
         />
 
-        {/* ── Main body ── */}
-        <Rect
-          x={boxX}
-          y={boxY}
-          width={boxW}
-          height={boxH}
-          rx={boxR}
-          ry={boxR}
-          fill="url(#bodyGrad)"
+        {/* ── Glowing coin slot ── */}
+        {/* Glow halo */}
+        <Polygon points={slotPts} fill="white" opacity={0.6} filter="url(#slotGlow)" />
+        {/* Slot itself */}
+        <Polygon points={slotPts} fill="white" opacity={0.95} />
+        {/* Inner dark slit */}
+        <Polygon
+          points={`${topMidLeft + 4},${slotMidY - slotH / 2 + 2} ${topMidRight - 4},${slotMidY - slotH / 2 + 2} ${topMidRight + (tR - fR) * 0.12 - 4},${slotMidY + slotH / 2 - 2} ${topMidLeft + (tL - fL) * 0.12 + 4},${slotMidY + slotH / 2 - 2}`}
+          fill="#050a30"
+          opacity={0.7}
         />
 
-        {/* ── Left metallic sheen ── */}
-        <Rect
-          x={boxX}
-          y={boxY}
-          width={boxW * 0.35}
-          height={boxH}
-          rx={boxR}
-          ry={boxR}
-          fill="url(#sheenGrad)"
-        />
+        {/* ── Front face ── */}
+        <Rect x={fL} y={fT} width={fW} height={fH} rx={6} fill="url(#pkFront)" />
 
-        {/* ── Top cap ── */}
-        <Rect
-          x={boxX - 3}
-          y={boxY - 10}
-          width={boxW + 6}
-          height={20}
-          rx={5}
-          fill="url(#capGrad)"
-        />
+        {/* Left sheen */}
+        <Rect x={fL} y={fT} width={fW * 0.4} height={fH} rx={6} fill="url(#pkSheen)" />
 
-        {/* ── Coin slot ── */}
-        <Rect
-          x={slotX}
-          y={slotY}
-          width={slotW}
-          height={slotH}
-          rx={slotH / 2}
-          fill="url(#slotGrad)"
-        />
-        {/* Slot highlight edge */}
-        <Rect
-          x={slotX + 1}
-          y={slotY + 1}
-          width={slotW - 2}
-          height={2}
-          rx={1}
-          fill="#4a7ae8"
-          opacity={0.4}
-        />
+        {/* Top edge of front face (chrome strip) */}
+        <Rect x={fL} y={fT} width={fW} height={4} rx={2} fill="#3848d0" opacity={0.7} />
 
-        {/* ── Chabad menorah (7 branches, simplified) ── */}
-        <G transform={`translate(${W / 2}, ${boxY + boxH * 0.22})`}>
+        {/* ── Bottom cap ── */}
+        <Rect x={fL + 8} y={fB - 10} width={fW - 16} height={14} rx={4} fill="url(#pkBottom)" />
+
+        {/* ── Chabad logo circle ── */}
+        <Circle cx={logoX} cy={logoY} r={logoR + 3}
+          fill="#0a1248" stroke="#2a3ab0" strokeWidth={1.5} />
+        <Circle cx={logoX} cy={logoY} r={logoR}
+          fill="url(#logoGrad)" stroke="#3848c8" strokeWidth={1} />
+
+        {/* Chabad 7-branch menorah inside circle */}
+        <G transform={`translate(${logoX},${logoY})`}>
           {/* Base */}
-          <Rect x={-18} y={22} width={36} height={4} rx={2} fill="#F59E0B" opacity={0.9} />
+          <Rect x={-logoR * 0.55} y={logoR * 0.5} width={logoR * 1.1} height={logoR * 0.14} rx={2} fill="#F59E0B" />
           {/* Center stem */}
-          <Rect x={-2} y={-20} width={4} height={42} rx={2} fill="#F59E0B" opacity={0.9} />
-          {/* Branch arms — pairs */}
+          <Rect x={-logoR * 0.06} y={-logoR * 0.7} width={logoR * 0.12} height={logoR * 1.2} rx={2} fill="#F59E0B" />
+          {/* Horizontal bar */}
+          <Rect x={-logoR * 0.72} y={logoR * 0.05} width={logoR * 1.44} height={logoR * 0.1} rx={2} fill="#F59E0B" opacity={0.85} />
+          {/* Branches */}
           {[
-            { x: -14, y: 4, h: 16 },
-            { x: 10,  y: 4, h: 16 },
-            { x: -22, y: 10, h: 10 },
-            { x: 18,  y: 10, h: 10 },
-          ].map((b, i) => (
-            <G key={i}>
-              <Rect x={b.x} y={b.y} width={4} height={b.h} rx={2} fill="#F59E0B" opacity={0.85} />
-            </G>
+            [-logoR * 0.42, logoR * 0.05, logoR * 0.42],
+            [ logoR * 0.30, logoR * 0.05, logoR * 0.42],
+            [-logoR * 0.66, logoR * 0.15, logoR * 0.32],
+            [ logoR * 0.54, logoR * 0.15, logoR * 0.32],
+          ].map(([x, y, h], i) => (
+            <Rect key={i} x={x} y={y} width={logoR * 0.11} height={h} rx={2} fill="#F59E0B" opacity={0.9} />
           ))}
-          {/* Horizontal connecting bar */}
-          <Rect x={-24} y={3} width={48} height={4} rx={2} fill="#F59E0B" opacity={0.7} />
-          {/* Flames on each branch top */}
-          {[-24, -14, -6, 0, 6, 14, 24].map((x, i) => (
-            <Ellipse key={i} cx={x + 2} cy={i === 3 ? -22 : (i < 3 ? 2 + (3 - i) * 2 : 2 + (i - 3) * 2)} rx={3} ry={4} fill="#F59E0B" opacity={0.9} />
+          {/* Flames (small ellipses at top of each branch) */}
+          {[
+            [0, -logoR * 0.75],
+            [-logoR * 0.38, logoR * 0.02],
+            [ logoR * 0.35, logoR * 0.02],
+            [-logoR * 0.62, logoR * 0.12],
+            [ logoR * 0.59, logoR * 0.12],
+          ].map(([x, y], i) => (
+            <Ellipse key={i} cx={x} cy={y} rx={logoR * 0.08} ry={logoR * 0.12}
+              fill="#FCD34D" opacity={0.95} />
           ))}
         </G>
 
-        {/* ── Hebrew text: בית חב״ד ── */}
+        {/* ── Chabad text on front face ── */}
         <SvgText
-          x={W / 2}
-          y={boxY + boxH * 0.55}
-          textAnchor="middle"
-          fill="#F8FAFF"
-          fontSize={15}
-          fontWeight="bold"
-          opacity={0.95}
+          x={W / 2} y={fT + fH * 0.72}
+          textAnchor="middle" fill="#F0F4FF"
+          fontSize={fW * 0.07} fontWeight="bold" fontFamily="Arial"
         >
           בית חב״ד
         </SvgText>
         <SvgText
-          x={W / 2}
-          y={boxY + boxH * 0.55 + 20}
-          textAnchor="middle"
-          fill="#bdd0ff"
-          fontSize={10}
-          opacity={0.8}
+          x={W / 2} y={fT + fH * 0.86}
+          textAnchor="middle" fill="#8090c8"
+          fontSize={fW * 0.045} fontFamily="Arial"
         >
           קרית בורוכוב ותל גנים
         </SvgText>
 
-        {/* ── Tzedaka text in small print ── */}
-        <SvgText
-          x={W / 2}
-          y={boxY + boxH * 0.82}
-          textAnchor="middle"
-          fill="#7a9ae8"
-          fontSize={11}
-          opacity={0.7}
-        >
-          קופת צדקה
-        </SvgText>
-
-        {/* ── Bottom cap ── */}
+        {/* ── Lock clasp at bottom ── */}
         <Rect
-          x={boxX + 6}
-          y={boxY + boxH - 6}
-          width={boxW - 12}
-          height={14}
-          rx={4}
-          fill="url(#bottomGrad)"
+          x={W / 2 - fW * 0.065} y={fB + 2}
+          width={fW * 0.13} height={fH * 0.055} rx={4}
+          fill="#0a1248" stroke="#2030a0" strokeWidth={1}
         />
-
-        {/* ── Lock clasp ── */}
-        <Rect
-          x={W / 2 - 10}
-          y={boxY + boxH + 2}
-          width={20}
-          height={7}
-          rx={3.5}
-          fill="#0f2060"
-          stroke="#2a50b0"
-          strokeWidth={1}
-        />
-        <Circle
-          cx={W / 2}
-          cy={boxY + boxH + 5.5}
-          r={2}
-          fill="#4a7ae8"
-          opacity={0.7}
-        />
+        <Circle cx={W / 2} cy={fB + 6} r={3} fill="#3040b8" opacity={0.8} />
       </Svg>
     </View>
   );
-});
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
-
-export default Pushke;
+}
