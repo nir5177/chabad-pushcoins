@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "בית חב\"ד קרית בורוכוב",
+    "slug": "chabad-pushcoins",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0A1628"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "il.org.chabad.kiryatborochov.pushcoins",
+      "infoPlist": {
+        "NSCameraUsageDescription": "לא נדרש",
+        "UIRequiresFullScreen": true
+      }
+    },
+    "android": {
+      "package": "il.org.chabad.kiryatborochov.pushcoins",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0A1628"
+      }
+    },
+    "plugins": [
+      "expo-haptics"
+    ]
+  }
+}
