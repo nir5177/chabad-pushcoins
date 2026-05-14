@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
-import { Pressable, Animated, StyleSheet, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Pressable, Animated, StyleSheet, View, Image } from 'react-native';
+import { COIN_IMAGES } from '../data/coinImages';
 import Svg, {
   Circle, Ellipse, G, Path, Rect,
   Text as SvgText, Defs, LinearGradient, Stop, Filter,
@@ -276,6 +277,8 @@ function CoinFace({ value, diam }) {
 export default function CoinButton({ coin, onPress }) {
   const scale = useRef(new Animated.Value(1)).current;
   const diam  = DIAM[coin.value] || 80;
+  const [imgFailed, setImgFailed] = useState(false);
+  const photoUri = COIN_IMAGES[coin.value];
 
   function pressIn() {
     Animated.spring(scale, { toValue: 0.87, useNativeDriver: true, speed: 60, bounciness: 3 }).start();
@@ -295,7 +298,22 @@ export default function CoinButton({ coin, onPress }) {
         hitSlop={10}
         style={styles.pressable}
       >
-        <CoinFace value={coin.value} diam={diam} />
+        <View style={{ width: diam, height: diam }}>
+          {/* SVG fallback always rendered underneath — visible if photo fails */}
+          <CoinFace value={coin.value} diam={diam} />
+
+          {/* Real coin photo overlay (circular crop with drop shadow) */}
+          {photoUri && !imgFailed && (
+            <Image
+              source={{ uri: photoUri }}
+              style={[styles.photo, {
+                width: diam, height: diam, borderRadius: diam / 2,
+              }]}
+              onError={() => setImgFailed(true)}
+              resizeMode="cover"
+            />
+          )}
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -303,4 +321,10 @@ export default function CoinButton({ coin, onPress }) {
 
 const styles = StyleSheet.create({
   pressable: { alignItems: 'center', justifyContent: 'center' },
+  photo: {
+    position: 'absolute', top: 0, left: 0,
+    shadowColor: '#000', shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 3 }, shadowRadius: 5,
+    elevation: 4,
+  },
 });

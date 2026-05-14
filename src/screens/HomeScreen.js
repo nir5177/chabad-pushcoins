@@ -215,7 +215,7 @@ export default function HomeScreen() {
 
       {/* ── Pushke ── */}
       <View style={styles.pushkeWrap}>
-        <Pushke width={SW * 0.88} height={SW * 0.62} />
+        <Pushke width={SW * 0.95} height={SW * 0.78} />
       </View>
 
       {/* ── Total + Donate ── */}
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   },
 
   /* Carousel */
-  carouselWrap: { height: 160, position: 'relative' },
+  carouselWrap: { height: 140, position: 'relative' },
   coinCard:     {
     width: COIN_CARD_W,
     alignItems: 'center',
@@ -292,7 +292,12 @@ const styles = StyleSheet.create({
   },
 
   /* Pushke */
-  pushkeWrap: { alignItems: 'center', marginBottom: 4 },
+  pushkeWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4, marginBottom: 8,
+    flexShrink: 0,
+  },
 
   /* Bottom bar */
   bottomBar:   {
