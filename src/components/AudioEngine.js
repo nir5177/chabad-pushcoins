@@ -45,9 +45,7 @@ const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
       try {
         const sound = sounds.current[keyFor(value)];
         if (!sound) return;
-        await sound.stopAsync();
-        await sound.setPositionAsync(0);
-        await sound.playAsync();
+        await sound.replayAsync();
       } catch (_) {}
     },
   }));

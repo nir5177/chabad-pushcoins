@@ -32,26 +32,29 @@ function fmt(n) {
 }
 
 export default function HomeScreen() {
-  const audioRef   = useRef(null);
-  const flatRef    = useRef(null);
-  const pushkeRef  = useRef(null);
-  const scrollX    = useRef(new Animated.Value(INIT_IDX * CARD_W)).current;
-  const dragX      = useRef(new Animated.Value(0)).current;
-  const dragY      = useRef(new Animated.Value(0)).current;
-  const slotX      = useRef(SW / 2);
-  const slotY      = useRef(500);
-  const dragCoin   = useRef(COINS[INIT_IDX]);
+  const audioRef      = useRef(null);
+  const flatRef       = useRef(null);
+  const pushkeRef     = useRef(null);
+  const containerRef  = useRef(null);
+  const scrollX       = useRef(new Animated.Value(INIT_IDX * CARD_W)).current;
+  const dragX         = useRef(new Animated.Value(0)).current;
+  const dragY         = useRef(new Animated.Value(0)).current;
+  // Absolute page coords of slot center and container origin
+  const slotPageX     = useRef(SW / 2);
+  const slotPageY     = useRef(500);
+  const containerOrigin = useRef({ x: 0, y: 0 });
+  const dragCoin      = useRef(COINS[INIT_IDX]);
 
-  const [total,        setTotal]       = useState(0);
-  const [coinCount,    setCoinCount]   = useState(0);
-  const [selIdx,       setSelIdx]      = useState(INIT_IDX);
-  const [showDonate,   setShowDonate]  = useState(false);
-  const [dragging,     setDragging]    = useState(false);
-  const [slotActive,   setSlotActive]  = useState(false);
+  const [total,        setTotal]      = useState(0);
+  const [coinCount,    setCoinCount]  = useState(0);
+  const [selIdx,       setSelIdx]     = useState(INIT_IDX);
+  const [showDonate,   setShowDonate] = useState(false);
+  const [dragging,     setDragging]   = useState(false);
+  const [slotActive,   setSlotActive] = useState(false);
 
   const selectedCoin = COINS[selIdx];
 
-  // Scroll to initial position safely (no initialScrollIndex on Android)
+  // Scroll to initial position
   useEffect(() => {
     const t = setTimeout(() => {
       flatRef.current?.scrollToIndex({ index: INIT_IDX, animated: false });
@@ -59,18 +62,26 @@ export default function HomeScreen() {
     return () => clearTimeout(t);
   }, []);
 
-  // Measure the pushke slot's absolute screen position
+  // Measure root container origin (pageX/pageY) so we can convert
+  // absolute gesture coordinates → coordinates relative to this container.
+  const measureContainer = useCallback(() => {
+    containerRef.current?.measure((_fx, _fy, _w, _h, px, py) => {
+      containerOrigin.current = { x: px, y: py };
+    });
+  }, []);
+
+  // Measure where the pushke's coin slot is in absolute page coordinates
   const measureSlot = useCallback(() => {
     setTimeout(() => {
       pushkeRef.current?.measure((_x, _y, w, h, pageX, pageY) => {
-        // slot is at ~20% from the top of the pushke SVG
-        slotX.current = pageX + (w || SW * 0.95) / 2;
-        slotY.current = pageY + (h || SW * 0.65) * 0.20;
+        const pw = w  || SW * 0.95;
+        const ph = h  || SW * 0.65;
+        slotPageX.current = pageX + pw / 2;
+        slotPageY.current = pageY + ph * 0.20;
       });
-    }, 300);
+    }, 400);
   }, []);
 
-  // Insert coin into box
   const insertCoin = useCallback((coin) => {
     setTotal(t => Math.round((t + coin.value) * 10) / 10);
     setCoinCount(c => c + 1);
@@ -82,7 +93,6 @@ export default function HomeScreen() {
     );
   }, []);
 
-  // PanResponder lives on the large draggable coin token below the carousel
   const pan = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder:  () => true,
@@ -91,8 +101,9 @@ export default function HomeScreen() {
       const { pageX, pageY } = e.nativeEvent;
       const d = DIAM[selectedCoin.value] || 80;
       dragCoin.current = selectedCoin;
-      dragX.setValue(pageX - d / 2);
-      dragY.setValue(pageY - d / 2);
+      // Convert to container-relative coordinates
+      dragX.setValue(pageX - containerOrigin.current.x - d / 2);
+      dragY.setValue(pageY - containerOrigin.current.y - d / 2);
       setDragging(true);
       Haptics.selectionAsync();
     },
@@ -100,25 +111,27 @@ export default function HomeScreen() {
     onPanResponderMove: (e) => {
       const { pageX, pageY } = e.nativeEvent;
       const d = DIAM[dragCoin.current.value] || 80;
-      dragX.setValue(pageX - d / 2);
-      dragY.setValue(pageY - d / 2);
+      dragX.setValue(pageX - containerOrigin.current.x - d / 2);
+      dragY.setValue(pageY - containerOrigin.current.y - d / 2);
       const near =
-        Math.abs(pageX - slotX.current) < 90 &&
-        Math.abs(pageY - slotY.current) < 60;
+        Math.abs(pageX - slotPageX.current) < 90 &&
+        Math.abs(pageY - slotPageY.current) < 70;
       setSlotActive(near);
     },
 
     onPanResponderRelease: (e) => {
       const { pageX, pageY } = e.nativeEvent;
       const d = DIAM[dragCoin.current.value] || 80;
-      const nearX = Math.abs(pageX - slotX.current) < 90;
-      const nearY = Math.abs(pageY - slotY.current) < 60;
+      const nearX = Math.abs(pageX - slotPageX.current) < 90;
+      const nearY = Math.abs(pageY - slotPageY.current) < 70;
 
       if (nearX && nearY) {
-        // Snap into slot, then insert
+        // Snap coin into slot (convert slot page coords to container-relative)
+        const snapX = slotPageX.current - containerOrigin.current.x - d / 2;
+        const snapY = slotPageY.current - containerOrigin.current.y - d / 2;
         Animated.parallel([
-          Animated.timing(dragX, { toValue: slotX.current - d / 2, duration: 130, useNativeDriver: false }),
-          Animated.timing(dragY, { toValue: slotY.current - d / 2, duration: 130, useNativeDriver: false }),
+          Animated.timing(dragX, { toValue: snapX, duration: 120, useNativeDriver: false }),
+          Animated.timing(dragY, { toValue: snapY, duration: 120, useNativeDriver: false }),
         ]).start(() => {
           setDragging(false);
           setSlotActive(false);
@@ -136,7 +149,6 @@ export default function HomeScreen() {
     },
   }), [selectedCoin, dragX, dragY, insertCoin]);
 
-  // Carousel item — tap to select, no tap-to-insert
   const renderCoin = useCallback(({ item, index }) => {
     const range = [(index - 1) * CARD_W, index * CARD_W, (index + 1) * CARD_W];
     const scale   = scrollX.interpolate({ inputRange: range, outputRange: [0.72, 1, 0.72], extrapolate: 'clamp' });
@@ -154,92 +166,98 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <AudioEngine ref={audioRef} />
-
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>בית חב״ד</Text>
-        <Text style={styles.headerSub}>קרית בורוכוב ותל גנים</Text>
-      </View>
-
-      {/* ── Carousel (select denomination) ── */}
-      <Animated.FlatList
-        ref={flatRef}
-        data={COINS}
-        keyExtractor={c => String(c.value)}
-        renderItem={renderCoin}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={CARD_W}
-        snapToAlignment="center"
-        decelerationRate="fast"
-        style={styles.carousel}
-        contentContainerStyle={{ paddingHorizontal: CARD_PAD }}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: true }
-        )}
-        scrollEventThrottle={16}
-        getItemLayout={(_, i) => ({ length: CARD_W, offset: CARD_W * i, index: i })}
-        onMomentumScrollEnd={(e) => {
-          const idx = Math.round(e.nativeEvent.contentOffset.x / CARD_W);
-          setSelIdx(Math.max(0, Math.min(COINS.length - 1, idx)));
-        }}
-      />
-
-      {/* ── Draggable coin token ── */}
-      <View style={styles.dragArea} {...pan.panHandlers}>
-        <View style={[styles.dragToken, dragging && { opacity: 0.25 }]}>
-          <CoinButton coin={selectedCoin} onPress={() => {}} />
-        </View>
-        <Text style={styles.dragHint}>↓  גרור לתוך חריץ הפושקה  ↓</Text>
-      </View>
-
-      {/* ── Pushke ── */}
       <View
-        ref={pushkeRef}
-        style={styles.pushkeWrap}
-        onLayout={measureSlot}
+        ref={containerRef}
+        style={styles.inner}
+        onLayout={measureContainer}
       >
-        <Pushke width={SW * 0.95} height={SW * 0.65} slotActive={slotActive} />
-      </View>
+        <AudioEngine ref={audioRef} />
 
-      {/* ── Bottom bar ── */}
-      <View style={styles.bottomBar}>
-        <View style={styles.totalWrap}>
-          <Text style={styles.totalAmount}>{fmt(total)} ₪</Text>
-          <Text style={styles.totalLabel}>
-            {coinCount === 0 ? 'גרור מטבע לפושקה' : `${coinCount} מטבע${coinCount === 1 ? '' : 'ות'}`}
-          </Text>
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>בית חב״ד</Text>
+          <Text style={styles.headerSub}>קרית בורוכוב ותל גנים</Text>
         </View>
-        <TouchableOpacity
-          style={[styles.donateBtn, total === 0 && styles.donateBtnOff]}
-          onPress={() => {
-            if (total === 0) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); return; }
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setShowDonate(true);
+
+        {/* ── Carousel ── */}
+        <Animated.FlatList
+          ref={flatRef}
+          data={COINS}
+          keyExtractor={c => String(c.value)}
+          renderItem={renderCoin}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={CARD_W}
+          snapToAlignment="center"
+          decelerationRate="fast"
+          style={styles.carousel}
+          contentContainerStyle={{ paddingHorizontal: CARD_PAD }}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={16}
+          getItemLayout={(_, i) => ({ length: CARD_W, offset: CARD_W * i, index: i })}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / CARD_W);
+            setSelIdx(Math.max(0, Math.min(COINS.length - 1, idx)));
           }}
-          activeOpacity={0.85}
+        />
+
+        {/* ── Drag area ── */}
+        <View style={styles.dragArea} {...pan.panHandlers}>
+          <View style={[styles.dragToken, dragging && { opacity: 0.25 }]}>
+            <CoinButton coin={selectedCoin} onPress={() => {}} />
+          </View>
+          <Text style={styles.dragHint}>↓  גרור לתוך חריץ הפושקה  ↓</Text>
+        </View>
+
+        {/* ── Pushke ── */}
+        <View
+          ref={pushkeRef}
+          style={styles.pushkeWrap}
+          onLayout={measureSlot}
         >
-          <Text style={styles.donateBtnText}>{total > 0 ? `תרום ${fmt(total)} ₪` : 'תרום'} 💙</Text>
-        </TouchableOpacity>
+          <Pushke width={SW * 0.95} height={SW * 0.65} slotActive={slotActive} />
+        </View>
+
+        {/* ── Bottom bar ── */}
+        <View style={styles.bottomBar}>
+          <View style={styles.totalWrap}>
+            <Text style={styles.totalAmount}>{fmt(total)} ₪</Text>
+            <Text style={styles.totalLabel}>
+              {coinCount === 0 ? 'גרור מטבע לפושקה' : `${coinCount} מטבע${coinCount === 1 ? '' : 'ות'}`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.donateBtn, total === 0 && styles.donateBtnOff]}
+            onPress={() => {
+              if (total === 0) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); return; }
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setShowDonate(true);
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.donateBtnText}>{total > 0 ? `תרום ${fmt(total)} ₪` : 'תרום'} 💙</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Floating coin (follows finger during drag) ── */}
+        {dragging && (
+          <Animated.View pointerEvents="none" style={[styles.floatingCoin, { left: dragX, top: dragY }]}>
+            <CoinButton coin={dragCoin.current} onPress={() => {}} />
+          </Animated.View>
+        )}
+
+        {/* ── Payment modal ── */}
+        <PaymentScreen
+          visible={showDonate}
+          total={total}
+          coinCount={coinCount}
+          onClose={() => setShowDonate(false)}
+          onReset={() => { setTotal(0); setCoinCount(0); setShowDonate(false); }}
+        />
       </View>
-
-      {/* ── Floating coin follows finger during drag ── */}
-      {dragging && (
-        <Animated.View pointerEvents="none" style={[styles.floatingCoin, { left: dragX, top: dragY }]}>
-          <CoinButton coin={dragCoin.current} onPress={() => {}} />
-        </Animated.View>
-      )}
-
-      {/* ── Payment modal ── */}
-      <PaymentScreen
-        visible={showDonate}
-        total={total}
-        coinCount={coinCount}
-        onClose={() => setShowDonate(false)}
-        onReset={() => { setTotal(0); setCoinCount(0); setShowDonate(false); }}
-      />
     </SafeAreaView>
   );
 }
@@ -249,17 +267,18 @@ const INDIGO = '#1e1b8a';
 const MUTED  = '#7070a0';
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: BG },
+  safe:  { flex: 1, backgroundColor: BG },
+  inner: { flex: 1 },
 
   header:      { alignItems: 'center', paddingTop: 6, paddingBottom: 2 },
   headerTitle: { fontSize: 20, fontWeight: '900', color: INDIGO },
   headerSub:   { fontSize: 11, color: MUTED },
 
-  carousel: { height: 108, flexGrow: 0 },
-  coinCard:  { width: CARD_W, alignItems: 'center', justifyContent: 'center', paddingVertical: 4 },
+  carousel:      { height: 108, flexGrow: 0 },
+  coinCard:      { width: CARD_W, alignItems: 'center', justifyContent: 'center', paddingVertical: 4 },
   coinCardLabel: { color: MUTED, fontSize: 11, marginTop: 2 },
 
-  dragArea: { alignItems: 'center', paddingVertical: 6 },
+  dragArea:  { alignItems: 'center', paddingVertical: 6 },
   dragToken: { },
   dragHint:  { color: INDIGO, fontSize: 13, fontWeight: '700', marginTop: 4, opacity: 0.65 },
 
@@ -275,7 +294,7 @@ const styles = StyleSheet.create({
     borderRadius: 24, shadowColor: INDIGO,
     shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5,
   },
-  donateBtnOff: { backgroundColor: '#b0b0c8', shadowOpacity: 0 },
+  donateBtnOff:  { backgroundColor: '#b0b0c8', shadowOpacity: 0 },
   donateBtnText: { color: 'white', fontSize: 15, fontWeight: '700' },
 
   floatingCoin: { position: 'absolute', zIndex: 999 },
