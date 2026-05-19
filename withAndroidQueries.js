@@ -13,6 +13,7 @@ module.exports = function withAndroidQueries(config) {
       package: [
         { $: { 'android:name': 'com.whatsapp' } },
         { $: { 'android:name': 'com.whatsapp.w4b' } },
+        { $: { 'android:name': 'com.onyx.bit' } },
       ],
       intent: [
         {
