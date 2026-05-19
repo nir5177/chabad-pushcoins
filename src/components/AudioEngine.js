@@ -1,52 +1,55 @@
-import React, { forwardRef, useImperativeHandle, useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle, useEffect, useRef } from 'react';
 import { Audio } from 'expo-av';
 
-/*
- * 3 real coin-drop recordings, pitch-shifted per denomination:
- *
- *  coin.mp3  (36KB) — metallic clank, used for ½₪ and ₪1
- *  coin2.mp3 (7KB)  — light drop,    used for ₪2
- *  coin3.mp3 (45KB) — deep clank,    used for ₪5 and ₪10
- *
- * Playback rate shifts pitch: >1 = higher, <1 = lower.
- */
-const SOUNDS = {
-  0.5: { src: require('../../assets/coin2.mp3'), rate: 1.0 },
-  1:   { src: require('../../assets/coin2.mp3'), rate: 1.0 },
-  2:   { src: require('../../assets/coin.mp3'),  rate: 1.0 },
-  5:   { src: require('../../assets/coin.mp3'),  rate: 1.0 },
-  10:  { src: require('../../assets/coin3.mp3'), rate: 1.0 },
+// Preloaded sounds: light (½₪,₪1), medium (₪2), heavy (₪5,₪10)
+const SOURCES = {
+  light:  require('../../assets/coin2.mp3'),
+  medium: require('../../assets/coin.mp3'),
+  heavy:  require('../../assets/coin3.mp3'),
 };
 
-async function initAudio() {
-  try {
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-    });
-  } catch (_) {}
-}
-
-async function playSound(value) {
-  try {
-    const cfg = SOUNDS[value] ?? SOUNDS[1];
-    const { sound } = await Audio.Sound.createAsync(cfg.src, {
-      shouldPlay: true,
-      rate: cfg.rate,
-      shouldCorrectPitch: false,
-      volume: 1.0,
-    });
-    sound.setOnPlaybackStatusUpdate(status => {
-      if (status.didJustFinish) sound.unloadAsync();
-    });
-  } catch (_) {}
+function keyFor(value) {
+  if (value <= 1) return 'light';
+  if (value <= 2) return 'medium';
+  return 'heavy';
 }
 
 const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
-  useEffect(() => { initAudio(); }, []);
+  const sounds = useRef({});
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+        });
+        for (const [key, src] of Object.entries(SOURCES)) {
+          const { sound } = await Audio.Sound.createAsync(src, {
+            shouldPlay: false,
+            volume: 1.0,
+          });
+          if (mounted) sounds.current[key] = sound;
+        }
+      } catch (_) {}
+    })();
+    return () => {
+      mounted = false;
+      Object.values(sounds.current).forEach(s => s.unloadAsync().catch(() => {}));
+    };
+  }, []);
 
   useImperativeHandle(ref, () => ({
-    playCoin({ value }) { playSound(value); },
+    async playCoin({ value }) {
+      try {
+        const sound = sounds.current[keyFor(value)];
+        if (!sound) return;
+        await sound.stopAsync();
+        await sound.setPositionAsync(0);
+        await sound.playAsync();
+      } catch (_) {}
+    },
   }));
 
   return null;
