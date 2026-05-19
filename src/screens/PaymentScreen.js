@@ -50,38 +50,23 @@ export default function PaymentScreen({ visible, total, coinCount, onClose, onRe
   /* ── Bit deep-link ── */
   const openBit = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const bitUrl = `bit://pay?phone=${BIT_PHONE}&amount=${amount}`;
-    Linking.canOpenURL(bitUrl)
-      .then(ok => {
-        if (ok) return Linking.openURL(bitUrl);
-        // Bit not installed — open WhatsApp with message
-        const msg = `שלום! אני רוצה לתרום ${amount} ₪ לבית חב"ד קרית בורוכוב ותל גנים 🙏`;
-        const waUrl = `whatsapp://send?phone=${BIT_PHONE_INT}&text=${encodeURIComponent(msg)}`;
-        return Linking.canOpenURL(waUrl).then(waOk => {
-          if (waOk) return Linking.openURL(waUrl);
-          Alert.alert(
-            'שלם ידנית',
-            `פתח את אפליקציית Bit ושלח ${amount} ₪ למספר:\n📱 ${BIT_PHONE}`,
-            [{ text: 'הבנתי', style: 'default' }]
-          );
-        });
-      })
+    // Try to open Bit directly — skip canOpenURL (unreliable on Android)
+    Linking.openURL(`bit://send?phone=${BIT_PHONE}&amount=${amount}`)
       .catch(() =>
-        Alert.alert('שגיאה', 'לא ניתן לפתוח את Bit. אנא שלח ידנית למספר ' + BIT_PHONE)
+        // Bit not installed — fallback to WhatsApp
+        openWhatsApp()
       );
   }, [amount]);
 
-  /* ── WhatsApp fallback ── */
+  /* ── WhatsApp ── */
   const openWhatsApp = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const msg = `שלום! אני רוצה לתרום ${amount} ₪ לבית חב"ד קרית בורוכוב ותל גנים 🙏`;
-    const waUrl = `whatsapp://send?phone=${BIT_PHONE_INT}&text=${encodeURIComponent(msg)}`;
-    Linking.canOpenURL(waUrl)
-      .then(ok => {
-        if (ok) return Linking.openURL(waUrl);
-        Alert.alert('WhatsApp לא מותקן', `שלח הודעה ידנית למספר: ${BIT_PHONE}`);
-      })
-      .catch(() => Alert.alert('שגיאה', 'לא ניתן לפתוח את WhatsApp'));
+    // wa.me universal link — always works, opens WhatsApp or browser
+    Linking.openURL(`https://wa.me/${BIT_PHONE_INT}?text=${encodeURIComponent(msg)}`)
+      .catch(() =>
+        Alert.alert('שגיאה', 'לא ניתן לפתוח WhatsApp')
+      );
   }, [amount]);
 
   const handleReset = useCallback(() => {

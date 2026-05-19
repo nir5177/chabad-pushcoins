@@ -1,106 +1,91 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
 let WebView = null;
-try {
-  WebView = require('react-native-webview').WebView;
-} catch (_) {}
+try { WebView = require('react-native-webview').WebView; } catch (_) {}
 
-/**
- * Invisible WebView that synthesises realistic coin-clank sounds
- * via the Web Audio API. Each shekel denomination gets a distinct
- * metallic timbre tuned to sound like a real coin hitting a tin box.
- *
- * Usage (via ref):
- *   audioRef.current.playCoin({ value: 1, freq: 900 })
+/*
+ * Synthesises a realistic "coin dropping into a metal charity box" sound.
+ * Each denomination gets a distinct pitch but the same metallic character:
+ *   ½₪  — highest ping  (1380 Hz)
+ *   ₪1  — high ping     (950 Hz)
+ *   ₪2  — mid-high ping (750 Hz)
+ *   ₪5  — mid ping      (620 Hz)
+ *   ₪10 — deep clank    (420 Hz)
  */
-
-const AUDIO_PAGE = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/></head>
-<body>
-<script>
-const ctx = new (window.AudioContext || window.webkitAudioContext)();
-
-/* ── Coin sound engine ─────────────────────────────────────────── */
-function playCoin(freq, value) {
-  const now = ctx.currentTime;
-
-  /* 1. Primary metallic ring — sine wave with pitch drop */
-  const ring = ctx.createOscillator();
-  const ringGain = ctx.createGain();
-  ring.connect(ringGain);
-  ringGain.connect(ctx.destination);
-
-  ring.type = 'sine';
-  ring.frequency.setValueAtTime(freq, now);
-  ring.frequency.exponentialRampToValueAtTime(freq * 0.55, now + 0.35);
-
-  ringGain.gain.setValueAtTime(0.55, now);
-  ringGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
-
-  ring.start(now);
-  ring.stop(now + 0.4);
-
-  /* 2. Impact click — short noise burst through bandpass */
-  const bufLen = Math.floor(ctx.sampleRate * 0.04);
-  const noiseBuffer = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-  const data = noiseBuffer.getChannelData(0);
-  for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
-
-  const noiseNode = ctx.createBufferSource();
-  noiseNode.buffer = noiseBuffer;
-
-  const bp = ctx.createBiquadFilter();
-  bp.type = 'bandpass';
-  bp.frequency.value = freq * 2.2;
-  bp.Q.value = 1.8;
-
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0.9, now);
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
-
-  noiseNode.connect(bp);
-  bp.connect(noiseGain);
-  noiseGain.connect(ctx.destination);
-  noiseNode.start(now);
-  noiseNode.stop(now + 0.06);
-
-  /* 3. Upper partial — adds the "metallic tin box" resonance */
-  const partial = ctx.createOscillator();
-  const partialGain = ctx.createGain();
-  partial.connect(partialGain);
-  partialGain.connect(ctx.destination);
-
-  partial.type = 'triangle';
-  partial.frequency.setValueAtTime(freq * 3.7, now);
-  partial.frequency.exponentialRampToValueAtTime(freq * 2.5, now + 0.12);
-
-  partialGain.gain.setValueAtTime(0.28, now);
-  partialGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
-
-  partial.start(now);
-  partial.stop(now + 0.15);
+const AUDIO_PAGE = `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body><script>
+let ctx;
+function getCtx() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
 }
 
-window.document.addEventListener('message', onMsg);   // Android
-window.addEventListener('message', onMsg);             // iOS
+function playCoin(freq, value) {
+  const c = getCtx();
+  const now = c.currentTime;
+
+  /* ── Impact transient: short noise burst ── */
+  const bufLen = Math.floor(c.sampleRate * 0.025);
+  const buf = c.createBuffer(1, bufLen, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+  const noise = c.createBufferSource();
+  noise.buffer = buf;
+  const nfilt = c.createBiquadFilter();
+  nfilt.type = 'bandpass';
+  nfilt.frequency.value = freq * 1.8;
+  nfilt.Q.value = 1.2;
+  const ngain = c.createGain();
+  ngain.gain.setValueAtTime(1.2, now);
+  ngain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+  noise.connect(nfilt); nfilt.connect(ngain); ngain.connect(c.destination);
+  noise.start(now); noise.stop(now + 0.06);
+
+  /* ── Primary ring: coin resonance ── */
+  const ring = c.createOscillator();
+  const rgain = c.createGain();
+  ring.type = 'sine';
+  ring.frequency.setValueAtTime(freq, now);
+  ring.frequency.exponentialRampToValueAtTime(freq * 0.6, now + 0.45);
+  rgain.gain.setValueAtTime(0.6, now);
+  rgain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+  ring.connect(rgain); rgain.connect(c.destination);
+  ring.start(now); ring.stop(now + 0.5);
+
+  /* ── Box resonance: low thud of metal box ── */
+  const box = c.createOscillator();
+  const bgain = c.createGain();
+  box.type = 'triangle';
+  box.frequency.setValueAtTime(freq * 0.28, now);
+  box.frequency.exponentialRampToValueAtTime(freq * 0.18, now + 0.18);
+  bgain.gain.setValueAtTime(0.35, now);
+  bgain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+  box.connect(bgain); bgain.connect(c.destination);
+  box.start(now); box.stop(now + 0.22);
+
+  /* ── Overtone shimmer ── */
+  const ov = c.createOscillator();
+  const ogain = c.createGain();
+  ov.type = 'sine';
+  ov.frequency.setValueAtTime(freq * 2.76, now);
+  ov.frequency.exponentialRampToValueAtTime(freq * 2.0, now + 0.12);
+  ogain.gain.setValueAtTime(0.18, now);
+  ogain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+  ov.connect(ogain); ogain.connect(c.destination);
+  ov.start(now); ov.stop(now + 0.16);
+}
 
 function onMsg(e) {
   try {
     const d = JSON.parse(e.data);
-    if (d.type === 'playCoin') {
-      /* resume context on first interaction (iOS autoplay policy) */
-      if (ctx.state === 'suspended') ctx.resume();
-      playCoin(d.freq, d.value);
-    }
-  } catch (_) {}
+    if (d.type === 'playCoin') playCoin(d.freq, d.value);
+    if (d.type === 'ping') { window.ReactNativeWebView.postMessage('pong'); }
+  } catch(_) {}
 }
-</script>
-</body>
-</html>
-`;
+document.addEventListener('message', onMsg);
+window.addEventListener('message', onMsg);
+<\/script></body></html>`;
 
 const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
   const webviewRef = useRef(null);
@@ -109,9 +94,9 @@ const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
   useImperativeHandle(ref, () => ({
     playCoin({ freq, value }) {
       if (failed || !WebView) return;
-      webviewRef.current?.postMessage(
-        JSON.stringify({ type: 'playCoin', freq, value })
-      );
+      try {
+        webviewRef.current?.postMessage(JSON.stringify({ type: 'playCoin', freq, value }));
+      } catch (_) {}
     },
   }));
 
@@ -129,6 +114,7 @@ const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
         androidLayerType="hardware"
         onMessage={() => {}}
         onError={() => setFailed(true)}
+        onHttpError={() => setFailed(true)}
       />
     </View>
   );
@@ -136,18 +122,10 @@ const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
 
 const styles = StyleSheet.create({
   hidden: {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    opacity: 0,
-    top: -999,
-    left: -999,
+    position: 'absolute', width: 1, height: 1,
+    opacity: 0, top: -999, left: -999,
   },
-  webview: {
-    width: 1,
-    height: 1,
-    backgroundColor: 'transparent',
-  },
+  webview: { width: 1, height: 1, backgroundColor: 'transparent' },
 });
 
 export default AudioEngine;
