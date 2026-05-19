@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Pressable, Animated, StyleSheet } from 'react-native';
+import { Pressable, Animated, StyleSheet, Image } from 'react-native';
 import Svg, {
   Circle, Ellipse, G, Path, Rect, Line,
   Text as SvgText, Defs, LinearGradient, RadialGradient, Stop, ClipPath,
@@ -254,6 +254,15 @@ function CoinSVG({ value }) {
   );
 }
 
+/* ─── Local coin photo sources ────────────────────────────────────────────── */
+const COIN_PHOTOS = {
+  0.5: require('../../assets/coins/coin_half.png'),
+  1:   require('../../assets/coins/coin_1.png'),
+  2:   require('../../assets/coins/coin_2.png'),
+  5:   require('../../assets/coins/coin_5.png'),
+  10:  require('../../assets/coins/coin_10.png'),
+};
+
 /* ─── Pressable coin button ───────────────────────────────────────────────── */
 export default function CoinButton({ coin, onPress }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -275,7 +284,16 @@ export default function CoinButton({ coin, onPress }) {
         hitSlop={10}
         style={styles.pressable}
       >
-        <CoinSVG value={coin.value} />
+        {/* Try photo first, SVG as fallback */}
+        {COIN_PHOTOS[coin.value] ? (
+          <Image
+            source={COIN_PHOTOS[coin.value]}
+            style={{ width: diam, height: diam, borderRadius: diam / 2 }}
+            resizeMode="contain"
+          />
+        ) : (
+          <CoinSVG value={coin.value} />
+        )}
       </Pressable>
     </Animated.View>
   );
