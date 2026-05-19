@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<title>צלילי מטבעות — בית חב״ד</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0e0e2a;
+  font-family: Arial, sans-serif;
+  color: #f0f4ff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 32px;
+}
+h1 { font-size: 26px; color: #F59E0B; text-align: center; }
+p  { color: #8090c8; font-size: 14px; text-align: center; }
+
+.coins { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+
+.coin-btn {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; cursor: pointer; border: none; background: none;
+  padding: 16px;
+}
+.coin-btn:active .disc { transform: scale(0.9); }
+
+.disc {
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 900;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5),
+              inset 0 2px 4px rgba(255,255,255,0.25);
+  transition: transform 0.1s;
+  user-select: none;
+}
+.disc.silver {
+  background: radial-gradient(circle at 35% 30%, #f5f5f5, #c0c0c0 50%, #888 100%);
+  color: #333;
+}
+.disc.gold {
+  background: radial-gradient(circle at 35% 30%, #ffe87a, #e8a820 50%, #a06010 100%);
+  color: #3a1800;
+}
+.disc.bimetal {
+  background: radial-gradient(circle at 35% 30%, #f5f5f5, #c0c0c0 50%, #888 100%);
+  color: #333;
+  position: relative; overflow: hidden;
+}
+.disc.bimetal::after {
+  content: '';
+  position: absolute;
+  width: 55%; height: 55%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ffe87a, #e8a820 55%, #a06010);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.disc.bimetal span { position: relative; z-index: 1; }
+
+.label { color: #8090c8; font-size: 13px; }
+.desc  { color: #5060a0; font-size: 11px; }
+
+.play-all {
+  background: #1e1b8a;
+  color: white;
+  border: none;
+  border-radius: 28px;
+  padding: 14px 36px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(30,27,138,0.5);
+}
+.play-all:hover { background: #2a27b0; }
+
+.note { color: #4050a0; font-size: 12px; margin-top: -16px; }
+</style>
+</head>
+<body>
+
+<h1>🎵 צלילי מטבעות — בית חב״ד</h1>
+<p>לחץ על כל מטבע כדי לשמוע את הצליל שלו</p>
+
+<div class="coins">
+  <button class="coin-btn" onclick="play(1380, 0.5)">
+    <div class="disc silver" style="width:70px;height:70px;">½</div>
+    <div class="label">½ ₪</div>
+    <div class="desc">פינג גבוה</div>
+  </button>
+
+  <button class="coin-btn" onclick="play(950, 1)">
+    <div class="disc gold" style="width:80px;height:80px;">1</div>
+    <div class="label">₪1</div>
+    <div class="desc">פינג גבוה</div>
+  </button>
+
+  <button class="coin-btn" onclick="play(750, 2)">
+    <div class="disc silver" style="width:88px;height:88px;">2</div>
+    <div class="label">₪2</div>
+    <div class="desc">פינג בינוני</div>
+  </button>
+
+  <button class="coin-btn" onclick="play(620, 5)">
+    <div class="disc gold" style="width:96px;height:96px;">5</div>
+    <div class="label">₪5</div>
+    <div class="desc">קלאנג עמוק</div>
+  </button>
+
+  <button class="coin-btn" onclick="play(420, 10)">
+    <div class="disc bimetal" style="width:108px;height:108px;"><span>10</span></div>
+    <div class="label">₪10</div>
+    <div class="desc">קלאנג עמוק מאוד</div>
+  </button>
+</div>
+
+<button class="play-all" onclick="playAll()">▶ נגן את כל המטבעות ברצף</button>
+<div class="note">חייב לפעול בדפדפן עם אודיו מופעל</div>
+
+<script>
+let ctx;
+function getCtx() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+function play(freq, value) {
+  const c = getCtx();
+  const now = c.currentTime;
+
+  // Impact transient
+  const bufLen = Math.floor(c.sampleRate * 0.025);
+  const buf = c.createBuffer(1, bufLen, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) d[i] = (Math.random()*2-1) * (1 - i/bufLen);
+  const noise = c.createBufferSource();
+  noise.buffer = buf;
+  const nfilt = c.createBiquadFilter();
+  nfilt.type = 'bandpass'; nfilt.frequency.value = freq * 1.8; nfilt.Q.value = 1.2;
+  const ngain = c.createGain();
+  ngain.gain.setValueAtTime(1.2, now);
+  ngain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+  noise.connect(nfilt); nfilt.connect(ngain); ngain.connect(c.destination);
+  noise.start(now); noise.stop(now + 0.06);
+
+  // Primary ring
+  const ring = c.createOscillator();
+  const rgain = c.createGain();
+  ring.type = 'sine';
+  ring.frequency.setValueAtTime(freq, now);
+  ring.frequency.exponentialRampToValueAtTime(freq * 0.6, now + 0.45);
+  rgain.gain.setValueAtTime(0.6, now);
+  rgain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+  ring.connect(rgain); rgain.connect(c.destination);
+  ring.start(now); ring.stop(now + 0.5);
+
+  // Box resonance (metal charity box thud)
+  const box = c.createOscillator();
+  const bgain = c.createGain();
+  box.type = 'triangle';
+  box.frequency.setValueAtTime(freq * 0.28, now);
+  box.frequency.exponentialRampToValueAtTime(freq * 0.18, now + 0.18);
+  bgain.gain.setValueAtTime(0.35, now);
+  bgain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+  box.connect(bgain); bgain.connect(c.destination);
+  box.start(now); box.stop(now + 0.22);
+
+  // Overtone shimmer
+  const ov = c.createOscillator();
+  const ogain = c.createGain();
+  ov.type = 'sine';
+  ov.frequency.setValueAtTime(freq * 2.76, now);
+  ov.frequency.exponentialRampToValueAtTime(freq * 2.0, now + 0.12);
+  ogain.gain.setValueAtTime(0.18, now);
+  ogain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+  ov.connect(ogain); ogain.connect(c.destination);
+  ov.start(now); ov.stop(now + 0.16);
+}
+
+const COINS = [
+  {freq:1380, value:0.5},
+  {freq:950,  value:1},
+  {freq:750,  value:2},
+  {freq:620,  value:5},
+  {freq:420,  value:10},
+];
+function playAll() {
+  getCtx();
+  COINS.forEach((c, i) => setTimeout(() => play(c.freq, c.value), i * 700));
+}
+</script>
+</body>
+</html>
