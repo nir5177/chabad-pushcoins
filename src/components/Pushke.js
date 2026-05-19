@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import Svg, {
-  Rect, Polygon, Ellipse, Circle, G, Path,
-  Text as SvgText, Defs, LinearGradient, Stop, Filter,
-  FeGaussianBlur, FeMerge, FeMergeNode,
+  Rect, Polygon, Ellipse, Circle, G,
+  Text as SvgText, Defs, LinearGradient, Stop,
 } from 'react-native-svg';
 
 /**
@@ -60,15 +59,6 @@ export default function Pushke({ width = 300, height = 210 }) {
             <Stop offset="0.5" stopColor="#5060e0" stopOpacity="0" />
           </LinearGradient>
 
-          {/* Slot glow filter */}
-          <Filter id="slotGlow" x="-50%" y="-200%" width="200%" height="500%">
-            <FeGaussianBlur stdDeviation="4" result="blur" />
-            <FeMerge>
-              <FeMergeNode in="blur" />
-              <FeMergeNode in="SourceGraphic" />
-            </FeMerge>
-          </Filter>
-
           {/* Logo circle gradient */}
           <LinearGradient id="logoGrad" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0"   stopColor="#1a2880" />
@@ -96,8 +86,8 @@ export default function Pushke({ width = 300, height = 210 }) {
         />
 
         {/* ── Glowing coin slot ── */}
-        {/* Glow halo */}
-        <Polygon points={slotPts} fill="white" opacity={0.6} filter="url(#slotGlow)" />
+        {/* Outer glow (simple larger white polygon) */}
+        <Polygon points={slotPts} fill="white" opacity={0.35} />
         {/* Slot itself */}
         <Polygon points={slotPts} fill="white" opacity={0.95} />
         {/* Inner dark slit */}

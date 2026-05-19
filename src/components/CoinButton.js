@@ -3,8 +3,7 @@ import { Pressable, Animated, StyleSheet, View, Image } from 'react-native';
 import { COIN_IMAGES } from '../data/coinImages';
 import Svg, {
   Circle, Ellipse, G, Path, Rect,
-  Text as SvgText, Defs, LinearGradient, Stop, Filter,
-  FeGaussianBlur, FeMerge, FeMergeNode, FeTurbulence, FeColorMatrix,
+  Text as SvgText, Defs, LinearGradient, Stop,
   Line,
 } from 'react-native-svg';
 
