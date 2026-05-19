@@ -21,8 +21,8 @@ const COINS = [
   { value: 10,  label: '₪10',  freq: 420  },
 ];
 
-const DIAM   = { 0.5: 68, 1: 76, 2: 84, 5: 92, 10: 104 };
-const CARD_W = SW * 0.34;
+const DIAM    = { 0.5: 68, 1: 76, 2: 84, 5: 92, 10: 104 };
+const CARD_W  = SW * 0.34;
 const CARD_PAD = (SW - CARD_W) / 2;
 const INIT_IDX = 3; // ₪5
 
@@ -32,29 +32,30 @@ function fmt(n) {
 }
 
 export default function HomeScreen() {
-  const audioRef      = useRef(null);
-  const flatRef       = useRef(null);
-  const pushkeRef     = useRef(null);
-  const containerRef  = useRef(null);
-  const scrollX       = useRef(new Animated.Value(INIT_IDX * CARD_W)).current;
-  const dragX         = useRef(new Animated.Value(0)).current;
-  const dragY         = useRef(new Animated.Value(0)).current;
-  // Absolute page coords of slot center and container origin
-  const slotPageX     = useRef(SW / 2);
-  const slotPageY     = useRef(500);
+  const audioRef        = useRef(null);
+  const flatRef         = useRef(null);
+  const pushkeRef       = useRef(null);
+  const containerRef    = useRef(null);
+  const scrollX         = useRef(new Animated.Value(INIT_IDX * CARD_W)).current;
+  const dragX           = useRef(new Animated.Value(0)).current;
+  const dragY           = useRef(new Animated.Value(0)).current;
+  const dragScale       = useRef(new Animated.Value(1)).current;
+  // Page-absolute coords of slot center and container top-left
+  const slotPageX       = useRef(SW / 2);
+  const slotPageY       = useRef(500);
   const containerOrigin = useRef({ x: 0, y: 0 });
-  const dragCoin      = useRef(COINS[INIT_IDX]);
+  const dragCoin        = useRef(COINS[INIT_IDX]);
+  const insertingRef    = useRef(false); // guard against double-fire
 
-  const [total,        setTotal]      = useState(0);
-  const [coinCount,    setCoinCount]  = useState(0);
-  const [selIdx,       setSelIdx]     = useState(INIT_IDX);
-  const [showDonate,   setShowDonate] = useState(false);
-  const [dragging,     setDragging]   = useState(false);
-  const [slotActive,   setSlotActive] = useState(false);
+  const [total,      setTotal]      = useState(0);
+  const [coinCount,  setCoinCount]  = useState(0);
+  const [selIdx,     setSelIdx]     = useState(INIT_IDX);
+  const [showDonate, setShowDonate] = useState(false);
+  const [dragging,   setDragging]   = useState(false);
+  const [slotActive, setSlotActive] = useState(false);
 
   const selectedCoin = COINS[selIdx];
 
-  // Scroll to initial position
   useEffect(() => {
     const t = setTimeout(() => {
       flatRef.current?.scrollToIndex({ index: INIT_IDX, animated: false });
@@ -62,20 +63,19 @@ export default function HomeScreen() {
     return () => clearTimeout(t);
   }, []);
 
-  // Measure root container origin (pageX/pageY) so we can convert
-  // absolute gesture coordinates → coordinates relative to this container.
+  // Measure container origin so we can convert screen pageX/Y → relative coords
   const measureContainer = useCallback(() => {
     containerRef.current?.measure((_fx, _fy, _w, _h, px, py) => {
       containerOrigin.current = { x: px, y: py };
     });
   }, []);
 
-  // Measure where the pushke's coin slot is in absolute page coordinates
+  // Measure where the pushke slot sits in absolute screen space
   const measureSlot = useCallback(() => {
     setTimeout(() => {
       pushkeRef.current?.measure((_x, _y, w, h, pageX, pageY) => {
-        const pw = w  || SW * 0.95;
-        const ph = h  || SW * 0.65;
+        const pw = w || SW * 0.95;
+        const ph = h || SW * 0.65;
         slotPageX.current = pageX + pw / 2;
         slotPageY.current = pageY + ph * 0.20;
       });
@@ -85,6 +85,7 @@ export default function HomeScreen() {
   const insertCoin = useCallback((coin) => {
     setTotal(t => Math.round((t + coin.value) * 10) / 10);
     setCoinCount(c => c + 1);
+    // Play the uploaded MP3 for this denomination
     audioRef.current?.playCoin({ value: coin.value });
     Haptics.impactAsync(
       coin.value >= 5  ? Haptics.ImpactFeedbackStyle.Heavy  :
@@ -101,7 +102,9 @@ export default function HomeScreen() {
       const { pageX, pageY } = e.nativeEvent;
       const d = DIAM[selectedCoin.value] || 80;
       dragCoin.current = selectedCoin;
-      // Convert to container-relative coordinates
+      insertingRef.current = false;
+      dragScale.setValue(1);
+      // Position coin under finger (container-relative coords)
       dragX.setValue(pageX - containerOrigin.current.x - d / 2);
       dragY.setValue(pageY - containerOrigin.current.y - d / 2);
       setDragging(true);
@@ -109,6 +112,7 @@ export default function HomeScreen() {
     },
 
     onPanResponderMove: (e) => {
+      if (insertingRef.current) return;
       const { pageX, pageY } = e.nativeEvent;
       const d = DIAM[dragCoin.current.value] || 80;
       dragX.setValue(pageX - containerOrigin.current.x - d / 2);
@@ -120,34 +124,58 @@ export default function HomeScreen() {
     },
 
     onPanResponderRelease: (e) => {
+      if (insertingRef.current) return;
       const { pageX, pageY } = e.nativeEvent;
       const d = DIAM[dragCoin.current.value] || 80;
       const nearX = Math.abs(pageX - slotPageX.current) < 90;
       const nearY = Math.abs(pageY - slotPageY.current) < 70;
 
       if (nearX && nearY) {
-        // Snap coin into slot (convert slot page coords to container-relative)
+        insertingRef.current = true;
+        setSlotActive(false);
+
         const snapX = slotPageX.current - containerOrigin.current.x - d / 2;
         const snapY = slotPageY.current - containerOrigin.current.y - d / 2;
+
+        // Snap coin to slot center
         Animated.parallel([
-          Animated.timing(dragX, { toValue: snapX, duration: 120, useNativeDriver: false }),
-          Animated.timing(dragY, { toValue: snapY, duration: 120, useNativeDriver: false }),
+          Animated.timing(dragX, { toValue: snapX, duration: 140, useNativeDriver: false }),
+          Animated.timing(dragY, { toValue: snapY, duration: 140, useNativeDriver: false }),
         ]).start(() => {
-          setDragging(false);
-          setSlotActive(false);
+          // Coin reached slot: play sound + haptic, then shrink into slot
           insertCoin(dragCoin.current);
+          Animated.timing(dragScale, {
+            toValue: 0,
+            duration: 120,
+            useNativeDriver: false,
+          }).start(() => {
+            setDragging(false);
+            dragScale.setValue(1);
+            insertingRef.current = false;
+          });
         });
       } else {
-        setDragging(false);
+        // Missed — bounce back
         setSlotActive(false);
+        Animated.spring(dragScale, {
+          toValue: 0.6,
+          useNativeDriver: false,
+          tension: 300,
+          friction: 5,
+        }).start(() => {
+          setDragging(false);
+          dragScale.setValue(1);
+        });
       }
     },
 
     onPanResponderTerminate: () => {
       setDragging(false);
       setSlotActive(false);
+      dragScale.setValue(1);
+      insertingRef.current = false;
     },
-  }), [selectedCoin, dragX, dragY, insertCoin]);
+  }), [selectedCoin, dragX, dragY, dragScale, insertCoin]);
 
   const renderCoin = useCallback(({ item, index }) => {
     const range = [(index - 1) * CARD_W, index * CARD_W, (index + 1) * CARD_W];
@@ -173,13 +201,13 @@ export default function HomeScreen() {
       >
         <AudioEngine ref={audioRef} />
 
-        {/* ── Header ── */}
+        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>בית חב״ד</Text>
           <Text style={styles.headerSub}>קרית בורוכוב ותל גנים</Text>
         </View>
 
-        {/* ── Carousel ── */}
+        {/* Denomination carousel */}
         <Animated.FlatList
           ref={flatRef}
           data={COINS}
@@ -204,15 +232,15 @@ export default function HomeScreen() {
           }}
         />
 
-        {/* ── Drag area ── */}
+        {/* Draggable coin — grab here and drag down into the slot */}
         <View style={styles.dragArea} {...pan.panHandlers}>
-          <View style={[styles.dragToken, dragging && { opacity: 0.25 }]}>
+          <View style={[styles.dragToken, dragging && styles.dragTokenGhost]}>
             <CoinButton coin={selectedCoin} onPress={() => {}} />
           </View>
           <Text style={styles.dragHint}>↓  גרור לתוך חריץ הפושקה  ↓</Text>
         </View>
 
-        {/* ── Pushke ── */}
+        {/* Pushka box */}
         <View
           ref={pushkeRef}
           style={styles.pushkeWrap}
@@ -221,35 +249,47 @@ export default function HomeScreen() {
           <Pushke width={SW * 0.95} height={SW * 0.65} slotActive={slotActive} />
         </View>
 
-        {/* ── Bottom bar ── */}
+        {/* Bottom bar */}
         <View style={styles.bottomBar}>
           <View style={styles.totalWrap}>
             <Text style={styles.totalAmount}>{fmt(total)} ₪</Text>
             <Text style={styles.totalLabel}>
-              {coinCount === 0 ? 'גרור מטבע לפושקה' : `${coinCount} מטבע${coinCount === 1 ? '' : 'ות'}`}
+              {coinCount === 0
+                ? 'גרור מטבע לפושקה'
+                : `${coinCount} מטבע${coinCount === 1 ? '' : 'ות'}`}
             </Text>
           </View>
           <TouchableOpacity
             style={[styles.donateBtn, total === 0 && styles.donateBtnOff]}
             onPress={() => {
-              if (total === 0) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); return; }
+              if (total === 0) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                return;
+              }
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setShowDonate(true);
             }}
             activeOpacity={0.85}
           >
-            <Text style={styles.donateBtnText}>{total > 0 ? `תרום ${fmt(total)} ₪` : 'תרום'} 💙</Text>
+            <Text style={styles.donateBtnText}>
+              {total > 0 ? `תרום ${fmt(total)} ₪` : 'תרום'} 💙
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ── Floating coin (follows finger during drag) ── */}
+        {/* Floating coin — follows finger while dragging, shrinks into slot */}
         {dragging && (
-          <Animated.View pointerEvents="none" style={[styles.floatingCoin, { left: dragX, top: dragY }]}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.floatingCoin,
+              { left: dragX, top: dragY, transform: [{ scale: dragScale }] },
+            ]}
+          >
             <CoinButton coin={dragCoin.current} onPress={() => {}} />
           </Animated.View>
         )}
 
-        {/* ── Payment modal ── */}
         <PaymentScreen
           visible={showDonate}
           total={total}
@@ -278,9 +318,10 @@ const styles = StyleSheet.create({
   coinCard:      { width: CARD_W, alignItems: 'center', justifyContent: 'center', paddingVertical: 4 },
   coinCardLabel: { color: MUTED, fontSize: 11, marginTop: 2 },
 
-  dragArea:  { alignItems: 'center', paddingVertical: 6 },
-  dragToken: { },
-  dragHint:  { color: INDIGO, fontSize: 13, fontWeight: '700', marginTop: 4, opacity: 0.65 },
+  dragArea:      { alignItems: 'center', paddingVertical: 6 },
+  dragToken:     { },
+  dragTokenGhost: { opacity: 0.2 },
+  dragHint:      { color: INDIGO, fontSize: 13, fontWeight: '700', marginTop: 4, opacity: 0.65 },
 
   pushkeWrap: { alignItems: 'center', flex: 1 },
 
