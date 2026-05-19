@@ -63,10 +63,13 @@ export default function PaymentScreen({ visible, total, coinCount, onClose, onRe
   const openWhatsApp = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const msg = `שלום! אני רוצה לתרום ${amount} ₪ לבית חב"ד קרית בורוכוב ותל גנים 🙏`;
-    // wa.me universal link — always works, opens WhatsApp or browser
-    Linking.openURL(`https://wa.me/${BIT_PHONE_INT}?text=${encodeURIComponent(msg)}`)
+    const encoded = encodeURIComponent(msg);
+    // Direct app scheme — opens WhatsApp without going through browser
+    Linking.openURL(`whatsapp://send?phone=${BIT_PHONE_INT}&text=${encoded}`)
       .catch(() =>
-        Alert.alert('שגיאה', 'לא ניתן לפתוח WhatsApp')
+        // Fallback: universal link (opens browser → WhatsApp)
+        Linking.openURL(`https://wa.me/${BIT_PHONE_INT}?text=${encoded}`)
+          .catch(() => Alert.alert('שגיאה', 'לא ניתן לפתוח WhatsApp'))
       );
   }, [amount]);
 

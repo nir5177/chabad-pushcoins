@@ -23,6 +23,7 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0A1628"
       }
-    }
+    },
+    "plugins": ["./withAndroidQueries"]
   }
 }
