@@ -1,6 +1,10 @@
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
-import { WebView } from 'react-native-webview';
+
+let WebView = null;
+try {
+  WebView = require('react-native-webview').WebView;
+} catch (_) {}
 
 /**
  * Invisible WebView that synthesises realistic coin-clank sounds
@@ -100,14 +104,18 @@ function onMsg(e) {
 
 const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
   const webviewRef = useRef(null);
+  const [failed, setFailed] = useState(false);
 
   useImperativeHandle(ref, () => ({
     playCoin({ freq, value }) {
+      if (failed || !WebView) return;
       webviewRef.current?.postMessage(
         JSON.stringify({ type: 'playCoin', freq, value })
       );
     },
   }));
+
+  if (!WebView || failed) return null;
 
   return (
     <View style={styles.hidden} pointerEvents="none">
@@ -118,9 +126,9 @@ const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
         javaScriptEnabled
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback
-        /* Android: allow audio without user gesture */
         androidLayerType="hardware"
         onMessage={() => {}}
+        onError={() => setFailed(true)}
       />
     </View>
   );

@@ -181,7 +181,6 @@ export default function HomeScreen() {
             { useNativeDriver: true }
           )}
           scrollEventThrottle={16}
-          initialScrollIndex={2}   // start on ₪5
           getItemLayout={(_, i) => ({ length: COIN_CARD_W, offset: COIN_CARD_W * i, index: i })}
         />
 
