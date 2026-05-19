@@ -11,11 +11,11 @@ import { Audio } from 'expo-av';
  * Playback rate shifts pitch: >1 = higher, <1 = lower.
  */
 const SOUNDS = {
-  0.5: { src: require('../../assets/coin.mp3'),  rate: 1.35 },
-  1:   { src: require('../../assets/coin.mp3'),  rate: 1.15 },
-  2:   { src: require('../../assets/coin2.mp3'), rate: 1.0  },
-  5:   { src: require('../../assets/coin3.mp3'), rate: 1.0  },
-  10:  { src: require('../../assets/coin3.mp3'), rate: 0.75 },
+  0.5: { src: require('../../assets/coin2.mp3'), rate: 1.0 },
+  1:   { src: require('../../assets/coin2.mp3'), rate: 1.0 },
+  2:   { src: require('../../assets/coin.mp3'),  rate: 1.0 },
+  5:   { src: require('../../assets/coin.mp3'),  rate: 1.0 },
+  10:  { src: require('../../assets/coin3.mp3'), rate: 1.0 },
 };
 
 async function initAudio() {
