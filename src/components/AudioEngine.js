@@ -17,9 +17,13 @@ const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
     let mounted = true;
     (async () => {
       try {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: false,
+        });
         const loaded = await Promise.all(
-          SOURCES.map(src => Audio.Sound.createAsync(src, { shouldPlay: false, volume: 1.0 }))
+          SOURCES.map(src => Audio.Sound.createAsync(src, { shouldPlay: false, volume: 1.0, isMuted: false }))
         );
         if (mounted) sounds.current = loaded.map(r => r.sound);
       } catch (_) {}
@@ -39,7 +43,9 @@ const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
         do { idx = Math.floor(Math.random() * sounds.current.length); }
         while (idx === lastIdx.current && sounds.current.length > 1);
         lastIdx.current = idx;
-        await sounds.current[idx].replayAsync();
+        const s = sounds.current[idx];
+        await s.setVolumeAsync(1.0);
+        await s.replayAsync();
       } catch (_) {}
     },
   }));
