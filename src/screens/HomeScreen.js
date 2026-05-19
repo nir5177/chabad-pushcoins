@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import Pushke from '../components/Pushke';
-import CoinButton from '../components/CoinButton';
+import CoinButton, { COIN_DIAM } from '../components/CoinButton';
 import AudioEngine from '../components/AudioEngine';
 import PaymentScreen from './PaymentScreen';
 
@@ -21,7 +21,7 @@ const COINS = [
   { value: 10,  label: '₪10',  freq: 420  },
 ];
 
-const DIAM    = { 0.5: 68, 1: 76, 2: 84, 5: 92, 10: 104 };
+const DIAM    = COIN_DIAM; // real Israeli NIS proportions
 const CARD_W  = SW * 0.34;
 const CARD_PAD = (SW - CARD_W) / 2;
 const INIT_IDX = 3; // ₪5

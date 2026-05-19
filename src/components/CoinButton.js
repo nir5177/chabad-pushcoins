@@ -1,318 +1,281 @@
-import React, { useRef, useState } from 'react';
-import { Pressable, Animated, StyleSheet, View, Image } from 'react-native';
-import { COIN_IMAGES } from '../data/coinImages';
+import React, { useRef } from 'react';
+import { Pressable, Animated, StyleSheet } from 'react-native';
 import Svg, {
-  Circle, Ellipse, G, Path, Rect,
-  Text as SvgText, Defs, LinearGradient, Stop,
-  Line,
+  Circle, Ellipse, G, Path, Rect, Line,
+  Text as SvgText, Defs, LinearGradient, RadialGradient, Stop, ClipPath,
 } from 'react-native-svg';
 
 /*
- * Realistic Israeli New Shekel coins.
- * Each coin matches the actual size ratios, colours and motifs
- * of the corresponding ILS denomination.
+ * Real Israeli NIS coin proportions (actual diameter in mm):
+ *   ½ ₪  — 26.0 mm  silver  (nickel-plated steel)
+ *   ₪1   — 17.97mm  silver  (stainless steel)    ← smallest
+ *   ₪2   — 22.0 mm  gold    (aluminum-bronze)
+ *   ₪5   — 24.0 mm  bimetal (silver center + gold ring)
+ *   ₪10  — 23.5 mm  bimetal (gold center + silver ring)
  *
- * Denominations supported:
- *   0.5  — ½ ₪  silver  (nickel-clad steel)   lyre
- *   1    — ₪1   gold    (aluminum-bronze)      lily
- *   2    — ₪2   gold    (aluminum-bronze)       cornucopia
- *   5    — ₪5   silver  (nickel-clad steel)    pomegranate
- *   10   — ₪10  bimetal (gold center + silver ring)  menorah
+ * Screen sizes scaled so ₪1 = 60px (base).
  */
+const BASE = 60;
+const MM   = { 0.5: 26.0, 1: 17.97, 2: 22.0, 5: 24.0, 10: 23.5 };
+export const COIN_DIAM = Object.fromEntries(
+  Object.entries(MM).map(([v, mm]) => [v, Math.round((mm / 17.97) * BASE)])
+);
+// Results: { 0.5: 87, 1: 60, 2: 73, 5: 80, 10: 78 }
 
-/* ── Coin diameters (screen px) ─────────────────────────────── */
-const DIAM = { 0.5: 70, 1: 80, 2: 88, 5: 96, 10: 108 };
-
-/* ── Colour palettes ─────────────────────────────────────────── */
-const SILVER = {
-  hi:   '#f0f0f0', mid:  '#d0d0d0', lo:   '#a8a8a8',
-  edge: '#909090', dark: '#606060', text: '#303030',
+/* Metal colour palettes */
+const S = { // Silver / nickel
+  hi: '#F0F2F4', mid: '#D0D2D6', lo: '#A8AAAE', edge: '#888A8E', dark: '#50525A', text: '#383A40',
 };
-const GOLD = {
-  hi:   '#ffe880', mid:  '#e8a820', lo:   '#b07010',
-  edge: '#906010', dark: '#603800', text: '#2a1000',
+const G2 = { // Gold / aluminum-bronze
+  hi: '#F0CC60', mid: '#D4A020', lo: '#A87010', edge: '#806008', dark: '#502800', text: '#301800',
 };
 
-/* ── Shared rim serration helper ─────────────────────────────── */
-function MilledRim({ cx, cy, r, color, count = 60 }) {
-  const dots = [];
-  for (let i = 0; i < count; i++) {
-    const angle = (i / count) * 2 * Math.PI;
-    const x = cx + r * Math.cos(angle);
-    const y = cy + r * Math.sin(angle);
-    dots.push(
-      <Circle key={i} cx={x} cy={y} r={0.9}
-        fill={i % 2 === 0 ? color : 'transparent'} />
-    );
-  }
-  return <G>{dots}</G>;
-}
+/* ─── Coin motifs ─────────────────────────────────────────────────────────── */
 
-/* ── Lyre (½ shekel) ─────────────────────────────────────────── */
-function Lyre({ cx, cy, s }) {
+function Lyre({ r, c }) {   // ½ NIS — ancient lyre (כינור)
+  const s = r * 0.52;
   return (
-    <G transform={`translate(${cx},${cy})`}>
-      {/* Sound box */}
-      <Ellipse cx={0} cy={s * 0.18} rx={s * 0.28} ry={s * 0.18} fill="none" stroke={SILVER.dark} strokeWidth={s * 0.04} />
-      {/* Yoke arms */}
-      <Line x1={-s * 0.28} y1={s * 0.04} x2={-s * 0.28} y2={-s * 0.5} stroke={SILVER.dark} strokeWidth={s * 0.04} strokeLinecap="round"/>
-      <Line x1={ s * 0.28} y1={s * 0.04} x2={ s * 0.28} y2={-s * 0.5} stroke={SILVER.dark} strokeWidth={s * 0.04} strokeLinecap="round"/>
-      {/* Crossbar */}
-      <Line x1={-s * 0.28} y1={-s * 0.5} x2={s * 0.28} y2={-s * 0.5} stroke={SILVER.dark} strokeWidth={s * 0.04} strokeLinecap="round"/>
-      {/* Strings (5) */}
-      {[-0.18, -0.09, 0, 0.09, 0.18].map((dx, i) => (
-        <Line key={i}
-          x1={dx * s} y1={-s * 0.02}
-          x2={dx * s} y2={-s * 0.48}
-          stroke={SILVER.dark} strokeWidth={s * 0.025} opacity={0.7} />
+    <G>
+      <Ellipse cx={0} cy={s * 0.28} rx={s * 0.32} ry={s * 0.20} fill="none" stroke={c} strokeWidth={s * 0.09} />
+      <Line x1={-s*0.30} y1={s*0.12} x2={-s*0.30} y2={-s*0.54} stroke={c} strokeWidth={s*0.08} strokeLinecap="round"/>
+      <Line x1={ s*0.30} y1={s*0.12} x2={ s*0.30} y2={-s*0.54} stroke={c} strokeWidth={s*0.08} strokeLinecap="round"/>
+      <Line x1={-s*0.30} y1={-s*0.54} x2={s*0.30} y2={-s*0.54} stroke={c} strokeWidth={s*0.08} strokeLinecap="round"/>
+      {[-0.18,-0.08,0,0.08,0.18].map((dx,i)=>(
+        <Line key={i} x1={dx*s} y1={s*0.06} x2={dx*s} y2={-s*0.52} stroke={c} strokeWidth={s*0.045} opacity={0.8}/>
       ))}
     </G>
   );
 }
 
-/* ── Lily / iris (₪1) ───────────────────────────────────────── */
-function Lily({ cx, cy, s, color }) {
-  const c = color || GOLD.dark;
+function Lily({ r, c }) {   // ₪1 — lily / שושן
+  const s = r * 0.48;
   return (
-    <G transform={`translate(${cx},${cy})`}>
-      {/* Stem */}
-      <Line x1={0} y1={s * 0.1} x2={0} y2={s * 0.5} stroke={c} strokeWidth={s * 0.05} strokeLinecap="round"/>
-      {/* 3 upper petals */}
-      <Ellipse cx={0}          cy={-s * 0.15} rx={s * 0.09} ry={s * 0.32} fill={c} opacity={0.85}/>
-      <Ellipse cx={-s * 0.22}  cy={-s * 0.05} rx={s * 0.09} ry={s * 0.28} fill={c} opacity={0.75} transform={`rotate(-35,${-s*0.22},${-s*0.05})`}/>
-      <Ellipse cx={ s * 0.22}  cy={-s * 0.05} rx={s * 0.09} ry={s * 0.28} fill={c} opacity={0.75} transform={`rotate(35,${s*0.22},${-s*0.05})`}/>
-      {/* 3 lower petals (sepals) */}
-      <Ellipse cx={-s * 0.16}  cy={ s * 0.18} rx={s * 0.07} ry={s * 0.22} fill={c} opacity={0.6} transform={`rotate(20,${-s*0.16},${s*0.18})`}/>
-      <Ellipse cx={ s * 0.16}  cy={ s * 0.18} rx={s * 0.07} ry={s * 0.22} fill={c} opacity={0.6} transform={`rotate(-20,${s*0.16},${s*0.18})`}/>
+    <G>
+      <Line x1={0} y1={s*0.1} x2={0} y2={s*0.65} stroke={c} strokeWidth={s*0.1} strokeLinecap="round"/>
+      <Ellipse cx={0} cy={-s*0.12} rx={s*0.12} ry={s*0.44} fill={c} opacity={0.9}/>
+      <Ellipse cx={-s*0.28} cy={-s*0.04} rx={s*0.11} ry={s*0.36} fill={c} opacity={0.8} transform={`rotate(-38,${-s*0.28},${-s*0.04})`}/>
+      <Ellipse cx={ s*0.28} cy={-s*0.04} rx={s*0.11} ry={s*0.36} fill={c} opacity={0.8} transform={`rotate(38,${s*0.28},${-s*0.04})`}/>
+      <Ellipse cx={-s*0.20} cy={ s*0.22} rx={s*0.09} ry={s*0.28} fill={c} opacity={0.65} transform={`rotate(22,${-s*0.2},${s*0.22})`}/>
+      <Ellipse cx={ s*0.20} cy={ s*0.22} rx={s*0.09} ry={s*0.28} fill={c} opacity={0.65} transform={`rotate(-22,${s*0.2},${s*0.22})`}/>
     </G>
   );
 }
 
-/* ── Cornucopia / horn (₪2) ──────────────────────────────────── */
-function Cornucopia({ cx, cy, s, color }) {
-  const c = color || GOLD.dark;
+function Cornucopia({ r, c }) {  // ₪2 — two cornucopias
+  const s = r * 0.50;
   return (
-    <G transform={`translate(${cx},${cy})`}>
-      {/* Horn body */}
-      <Path
-        d={`M${-s*0.05},${-s*0.4} Q${s*0.5},${-s*0.1} ${s*0.38},${s*0.38} Q${s*0.1},${s*0.5} ${-s*0.35},${s*0.1} Z`}
-        fill={c} opacity={0.8}
-      />
-      {/* Horn opening highlight */}
-      <Ellipse cx={-s*0.18} cy={-s*0.22} rx={s*0.08} ry={s*0.16} fill={c} opacity={0.5} transform={`rotate(-30,${-s*0.18},${-s*0.22})`}/>
-      {/* Fruits spilling out */}
-      <Circle cx={-s*0.28} cy={-s*0.38} r={s*0.1} fill={c} opacity={0.85}/>
-      <Circle cx={-s*0.42} cy={-s*0.24} r={s*0.08} fill={c} opacity={0.7}/>
-      <Circle cx={-s*0.38} cy={-s*0.42} r={s*0.07} fill={c} opacity={0.65}/>
-      {/* Scroll at tip */}
-      <Circle cx={s*0.36} cy={s*0.32} r={s*0.07} fill="none" stroke={c} strokeWidth={s*0.03} opacity={0.7}/>
+    <G>
+      {/* Left horn */}
+      <Path d={`M${-s*0.08},${-s*0.5} Q${-s*0.6},${-s*0.2} ${-s*0.52},${s*0.38} Q${-s*0.28},${s*0.5} ${-s*0.05},${s*0.08} Z`} fill={c} opacity={0.8}/>
+      <Circle cx={-s*0.6}  cy={-s*0.36} r={s*0.1}  fill={c} opacity={0.85}/>
+      <Circle cx={-s*0.68} cy={-s*0.14} r={s*0.08} fill={c} opacity={0.7}/>
+      {/* Right horn (mirrored) */}
+      <Path d={`M${s*0.08},${-s*0.5} Q${s*0.6},${-s*0.2} ${s*0.52},${s*0.38} Q${s*0.28},${s*0.5} ${s*0.05},${s*0.08} Z`} fill={c} opacity={0.8}/>
+      <Circle cx={s*0.6}  cy={-s*0.36} r={s*0.1}  fill={c} opacity={0.85}/>
+      <Circle cx={s*0.68} cy={-s*0.14} r={s*0.08} fill={c} opacity={0.7}/>
     </G>
   );
 }
 
-/* ── Pomegranate (₪5) ────────────────────────────────────────── */
-function Pomegranate({ cx, cy, s, color }) {
-  const c = color || SILVER.dark;
+function Capital({ r, c }) {  // ₪5 — Ionic capital with palm leaves
+  const s = r * 0.52;
   return (
-    <G transform={`translate(${cx},${cy})`}>
-      {/* Crown (calyx) */}
-      {[-0.16, -0.06, 0.06, 0.16].map((dx, i) => (
-        <Path key={i}
-          d={`M${dx*s},${-s*0.12} L${dx*s - s*0.04},${-s*0.28} L${dx*s + s*0.04},${-s*0.28} Z`}
-          fill={c} opacity={0.8}
-        />
-      ))}
-      {/* Round fruit body */}
-      <Circle cx={0} cy={s * 0.16} r={s * 0.36} fill={c} opacity={0.8} />
-      <Circle cx={0} cy={s * 0.16} r={s * 0.28} fill="none" stroke={c} strokeWidth={s*0.03} opacity={0.4}/>
-      {/* Stem */}
-      <Line x1={0} y1={-s*0.12} x2={0} y2={-s*0.5} stroke={c} strokeWidth={s*0.04} strokeLinecap="round"/>
-      {/* Leaf */}
-      <Ellipse cx={s*0.1} cy={-s*0.32} rx={s*0.07} ry={s*0.14} fill={c} opacity={0.6} transform={`rotate(30,${s*0.1},${-s*0.32})`}/>
-    </G>
-  );
-}
-
-/* ── Menorah (₪10) ───────────────────────────────────────────── */
-function Menorah({ cx, cy, s, color }) {
-  const c = color || GOLD.dark;
-  const arms = [
-    [-s*0.3, s*0.1, s*0.3],
-    [ s*0.18, s*0.1, s*0.3],
-    [-s*0.46, s*0.18, s*0.2],
-    [ s*0.34, s*0.18, s*0.2],
-  ];
-  return (
-    <G transform={`translate(${cx},${cy})`}>
-      <Rect x={-s*0.04} y={-s*0.42} width={s*0.08} height={s*0.82} rx={s*0.02} fill={c}/>
-      <Rect x={-s*0.5} y={s*0.06} width={s} height={s*0.08} rx={s*0.02} fill={c} opacity={0.8}/>
-      <Rect x={-s*0.46} y={s*0.38} width={s*0.92} height={s*0.08} rx={s*0.02} fill={c}/>
-      {arms.map(([x, y, h], i) => (
-        <Rect key={i} x={x} y={y} width={s*0.08} height={h} rx={s*0.02} fill={c} opacity={0.9}/>
-      ))}
-      {[-s*0.48,-s*0.32,-s*0.14, 0, s*0.12, s*0.28, s*0.44].map((x, i) => (
-        <Ellipse key={i} cx={x+s*0.04} cy={i===3 ? -s*0.44 : (i<3 ? s*0.06+(3-i)*s*0.04 : s*0.06+(i-3)*s*0.04)} rx={s*0.05} ry={s*0.08} fill={c} opacity={0.9}/>
+    <G>
+      <Rect x={-s*0.55} y={s*0.30} width={s*1.10} height={s*0.22} rx={s*0.03} fill={c} opacity={0.9}/>
+      <Rect x={-s*0.42} y={s*0.10} width={s*0.84} height={s*0.22} rx={s*0.03} fill={c} opacity={0.85}/>
+      <Ellipse cx={-s*0.32} cy={-s*0.05} rx={s*0.18} ry={s*0.18} fill="none" stroke={c} strokeWidth={s*0.07} opacity={0.9}/>
+      <Ellipse cx={ s*0.32} cy={-s*0.05} rx={s*0.18} ry={s*0.18} fill="none" stroke={c} strokeWidth={s*0.07} opacity={0.9}/>
+      {[-0.48,-0.24,0,0.24,0.48].map((dx,i) => (
+        <Path key={i} d={`M${dx*s},${-s*0.06} Q${dx*s - s*0.08},${-s*0.5} ${dx*s},${-s*0.60}`}
+          fill="none" stroke={c} strokeWidth={s*0.06} strokeLinecap="round" opacity={0.8}/>
       ))}
     </G>
   );
 }
 
-/* ── Single coin SVG renderer ───────────────────────────────── */
-function CoinFace({ value, diam }) {
-  const r = diam / 2;
-  const cx = r, cy = r;
-  const isBimetal = value === 10;
-  const isSilver  = value === 0.5 || value === 5;
-  const pal       = isSilver ? SILVER : GOLD;
+function PalmTree({ r, c }) {  // ₪10 — date palm (תמר)
+  const s = r * 0.48;
+  return (
+    <G>
+      <Rect x={-s*0.07} y={-s*0.55} width={s*0.14} height={s*1.10} rx={s*0.04} fill={c}/>
+      {[[-0.42,-0.3,35],[-0.55,-0.1,20],[0.42,-0.3,-35],[0.55,-0.1,-20]].map(([dx,dy,rot],i)=>(
+        <Ellipse key={i} cx={dx*s} cy={dy*s} rx={s*0.20} ry={s*0.08}
+          fill={c} opacity={0.85} transform={`rotate(${rot},${dx*s},${dy*s})`}/>
+      ))}
+      {[[-0.28,-0.44,25],[-0.22,-0.24,12],[0.28,-0.44,-25],[0.22,-0.24,-12]].map(([dx,dy,rot],i)=>(
+        <Ellipse key={i} cx={dx*s} cy={dy*s} rx={s*0.15} ry={s*0.06}
+          fill={c} opacity={0.7} transform={`rotate(${rot},${dx*s},${dy*s})`}/>
+      ))}
+      <Ellipse cx={0} cy={s*0.44} rx={s*0.3} ry={s*0.08} fill={c} opacity={0.8}/>
+    </G>
+  );
+}
 
-  const faceId   = `face_${value}`;
-  const edgeId   = `edge_${value}`;
-  const innerFId = `innerF_${value}`;
+/* ─── Core coin renderer ──────────────────────────────────────────────────── */
+function CoinSVG({ value }) {
+  const diam = COIN_DIAM[value];
+  const R    = diam / 2;
+  const id   = `k${String(value).replace('.','_')}`;
 
-  const innerR   = isBimetal ? r * 0.58 : 0; // bimetal inner circle radius
-  const outerPal = isBimetal ? SILVER : pal;
-  const innerPal = isBimetal ? GOLD   : pal;
+  const isBimetal     = value === 5 || value === 10;
+  const silverCenter  = value === 5;   // ₪5: silver center, gold ring
+  const outerIsGold   = value === 5;   // ₪5 has gold outer ring
+  const isGold        = value === 2;   // pure gold coin
+  const isSilver      = !isGold && !isBimetal; // ½, 1
 
-  // Symbol scale relative to coin face
-  const symScale = r * 0.36;
+  const outerPal = (outerIsGold || isGold) ? G2 : S;
+  const innerPal = silverCenter ? S : G2;
+  const motifPal = isBimetal ? (silverCenter ? S : G2) : (isGold ? G2 : S);
+  const motifC   = motifPal.dark;
 
-  // Denomination string
-  const denomStr = value === 0.5 ? '½' : String(value);
-  const subLabel = value === 0.5 ? 'חצי שקל' : value === 1 ? 'שקל חדש' : value === 2 ? 'שקלים חדשים' : value === 5 ? 'שקלים חדשים' : 'שקלים חדשים';
+  const innerR   = R * 0.575;
 
   return (
     <Svg width={diam} height={diam} viewBox={`0 0 ${diam} ${diam}`}>
       <Defs>
-        {/* Outer face gradient */}
-        <LinearGradient id={faceId} x1="0.15" y1="0" x2="0.85" y2="1">
-          <Stop offset="0"    stopColor={outerPal.hi} />
-          <Stop offset="0.3"  stopColor={outerPal.mid} />
-          <Stop offset="0.7"  stopColor={outerPal.lo} />
-          <Stop offset="1"    stopColor={outerPal.edge} />
-        </LinearGradient>
-        {/* Edge (depth ring) */}
-        <LinearGradient id={edgeId} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0"    stopColor={outerPal.mid} />
-          <Stop offset="1"    stopColor={outerPal.dark} />
-        </LinearGradient>
-        {/* Inner circle gradient (bimetal only) */}
+        {/* Outer face — radial gradient simulates curved metallic surface */}
+        <RadialGradient id={`${id}f`} cx="36%" cy="30%" r="72%">
+          <Stop offset="0%"   stopColor={outerPal.hi} />
+          <Stop offset="28%"  stopColor={outerPal.mid} />
+          <Stop offset="65%"  stopColor={outerPal.lo} />
+          <Stop offset="100%" stopColor={outerPal.edge} />
+        </RadialGradient>
+        {/* Inner disc (bimetal) */}
         {isBimetal && (
-          <LinearGradient id={innerFId} x1="0.15" y1="0" x2="0.85" y2="1">
-            <Stop offset="0"   stopColor={innerPal.hi} />
-            <Stop offset="0.4" stopColor={innerPal.mid} />
-            <Stop offset="1"   stopColor={innerPal.lo} />
-          </LinearGradient>
+          <RadialGradient id={`${id}i`} cx="36%" cy="30%" r="72%">
+            <Stop offset="0%"   stopColor={innerPal.hi} />
+            <Stop offset="30%"  stopColor={innerPal.mid} />
+            <Stop offset="70%"  stopColor={innerPal.lo} />
+            <Stop offset="100%" stopColor={innerPal.edge} />
+          </RadialGradient>
+        )}
+        {/* Specular highlight */}
+        <RadialGradient id={`${id}s`} cx="28%" cy="22%" r="42%">
+          <Stop offset="0%"   stopColor="#FFFFFF" stopOpacity="0.72" />
+          <Stop offset="50%"  stopColor="#FFFFFF" stopOpacity="0.18" />
+          <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+        </RadialGradient>
+        <ClipPath id={`${id}cl`}>
+          <Circle cx={R} cy={R} r={R - 1} />
+        </ClipPath>
+        {isBimetal && (
+          <ClipPath id={`${id}cli`}>
+            <Circle cx={R} cy={R} r={innerR - 1} />
+          </ClipPath>
         )}
       </Defs>
 
-      {/* ── Coin depth (shadow ring) ── */}
-      <Circle cx={cx} cy={cy + r * 0.04} r={r - 0.5} fill={`url(#${edgeId})`} />
+      {/* Drop shadow */}
+      <Ellipse cx={R + 2.5} cy={R + 3.5} rx={R * 0.90} ry={R * 0.90} fill="#000" opacity={0.30} />
 
-      {/* ── Outer coin face ── */}
-      <Circle cx={cx} cy={cy} r={r - 1.5} fill={`url(#${faceId})`} />
+      {/* Outer coin body */}
+      <Circle cx={R} cy={R} r={R - 1} fill={`url(#${id}f)`} />
 
-      {/* ── Milled rim (serrations) ── */}
-      <MilledRim cx={cx} cy={cy} r={r - 2} color={outerPal.dark} count={72} />
+      {/* Milled rim (serrations) */}
+      {Array.from({ length: 80 }).map((_, i) => {
+        const a = (i / 80) * 2 * Math.PI;
+        const x = R + (R - 1.2) * Math.cos(a);
+        const y = R + (R - 1.2) * Math.sin(a);
+        return i % 2 === 0
+          ? <Circle key={i} cx={x} cy={y} r={0.8} fill={outerPal.dark} opacity={0.55} />
+          : null;
+      })}
 
-      {/* ── Inner face (rim inset) ── */}
-      <Circle cx={cx} cy={cy} r={r - 5} fill={`url(#${faceId})`} />
-      <Circle cx={cx} cy={cy} r={r - 5} fill="none" stroke={outerPal.edge} strokeWidth={0.8} opacity={0.5} />
+      {/* Raised inner platform */}
+      <Circle cx={R} cy={R} r={R - 5} fill={`url(#${id}f)`} />
+      <Circle cx={R} cy={R} r={R - 5} fill="none" stroke={outerPal.edge} strokeWidth={0.7} opacity={0.4} />
 
-      {/* ── Bimetallic inner circle ── */}
+      {/* Bimetallic separator + inner disc */}
       {isBimetal && (
         <>
-          <Circle cx={cx} cy={cy} r={innerR + 1} fill={outerPal.dark} opacity={0.4} />
-          <Circle cx={cx} cy={cy} r={innerR} fill={`url(#${innerFId})`} />
-          <Circle cx={cx} cy={cy} r={innerR} fill="none" stroke={innerPal.edge} strokeWidth={0.8} />
+          <Circle cx={R} cy={R} r={innerR + 1.5} fill={outerPal.dark} opacity={0.5} />
+          <Circle cx={R} cy={R} r={innerR} fill={`url(#${id}i)`} />
+          <Circle cx={R} cy={R} r={innerR} fill="none" stroke={innerPal.edge} strokeWidth={0.7} />
         </>
       )}
 
-      {/* ── Denomination symbol ── */}
-      {value === 0.5 && <Lyre        cx={cx} cy={cy - r*0.1} s={symScale} />}
-      {value === 1   && <Lily        cx={cx} cy={cy - r*0.06} s={symScale} color={GOLD.dark} />}
-      {value === 2   && <Cornucopia  cx={cx} cy={cy - r*0.04} s={symScale} color={GOLD.dark} />}
-      {value === 5   && <Pomegranate cx={cx} cy={cy - r*0.08} s={symScale} color={SILVER.dark} />}
-      {value === 10  && <Menorah     cx={cx} cy={cy - r*0.08} s={symScale * 0.8} color={GOLD.dark} />}
+      {/* Motif — rendered at coin center */}
+      <G transform={`translate(${R},${R - R * 0.12})`}>
+        {/* Emboss shadow (tiny offset for depth) */}
+        <G transform="translate(0.6,0.8)" opacity={0.35}>
+          {value === 0.5 && <Lyre       r={R} c={outerPal.dark} />}
+          {value === 1   && <Lily       r={R} c={motifC} />}
+          {value === 2   && <Cornucopia r={R} c={motifC} />}
+          {value === 5   && <Capital    r={R} c={motifC} />}
+          {value === 10  && <PalmTree   r={R} c={motifC} />}
+        </G>
+        {/* Main motif */}
+        {value === 0.5 && <Lyre       r={R} c={S.dark} />}
+        {value === 1   && <Lily       r={R} c={motifC} />}
+        {value === 2   && <Cornucopia r={R} c={motifC} />}
+        {value === 5   && <Capital    r={R} c={motifC} />}
+        {value === 10  && <PalmTree   r={R} c={motifC} />}
+      </G>
 
-      {/* ── Denomination numeral ── */}
+      {/* "מדינת ישראל" arc text */}
       <SvgText
-        x={cx} y={cy + r * 0.62}
+        x={R} y={R * 0.32}
         textAnchor="middle"
-        fill={isBimetal ? GOLD.dark : pal.dark}
-        fontSize={r * 0.38}
-        fontWeight="bold"
+        fontSize={R * 0.19}
         fontFamily="Arial"
-      >
-        {denomStr}
-      </SvgText>
-
-      {/* ── "שקלים חדשים" label ── */}
-      <SvgText
-        x={cx} y={cy + r * 0.84}
-        textAnchor="middle"
-        fill={isBimetal ? GOLD.dark : pal.dark}
-        fontSize={r * 0.16}
-        fontFamily="Arial"
+        fill={isBimetal ? outerPal.dark : motifPal.dark}
         opacity={0.75}
       >
-        {subLabel}
+        מדינת ישראל
       </SvgText>
 
-      {/* ── Glare highlight (top-left crescent) ── */}
-      <Ellipse
-        cx={cx - r * 0.22}
-        cy={cy - r * 0.3}
-        rx={r * 0.28}
-        ry={r * 0.14}
-        fill="white"
-        opacity={0.18}
-        transform={`rotate(-35,${cx},${cy})`}
-      />
+      {/* Denomination number */}
+      <SvgText
+        x={R} y={R * 1.78}
+        textAnchor="middle"
+        fontSize={R * 0.34}
+        fontWeight="900"
+        fontFamily="Arial"
+        fill={motifPal.dark}
+      >
+        {value === 0.5 ? '½' : value}
+      </SvgText>
+      {/* ₪ symbol */}
+      <SvgText
+        x={R} y={R * 1.96}
+        textAnchor="middle"
+        fontSize={R * 0.20}
+        fontWeight="700"
+        fontFamily="Arial"
+        fill={motifPal.dark}
+        opacity={0.8}
+      >
+        ₪
+      </SvgText>
+
+      {/* Specular highlight overlay */}
+      <Circle cx={R} cy={R} r={R - 1} fill={`url(#${id}s)`} />
     </Svg>
   );
 }
 
-/* ── Pressable CoinButton ────────────────────────────────────── */
+/* ─── Pressable coin button ───────────────────────────────────────────────── */
 export default function CoinButton({ coin, onPress }) {
   const scale = useRef(new Animated.Value(1)).current;
-  const diam  = DIAM[coin.value] || 80;
-  const [imgFailed, setImgFailed] = useState(false);
-  const photoUri = COIN_IMAGES[coin.value];
+  const diam  = COIN_DIAM[coin.value] || 72;
 
   function pressIn() {
-    Animated.spring(scale, { toValue: 0.87, useNativeDriver: true, speed: 60, bounciness: 3 }).start();
+    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 60, bounciness: 4 }).start();
   }
   function pressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 12 }).start();
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 14 }).start();
   }
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View style={{ transform: [{ scale }], width: diam, height: diam }}>
       <Pressable
         onPressIn={pressIn}
         onPressOut={pressOut}
-        onPress={() => onPress(coin)}
-        accessibilityRole="button"
-        accessibilityLabel={`הכנס מטבע ${coin.label}`}
+        onPress={() => onPress && onPress(coin)}
         hitSlop={10}
         style={styles.pressable}
       >
-        <View style={{ width: diam, height: diam }}>
-          {/* SVG fallback always rendered underneath — visible if photo fails */}
-          <CoinFace value={coin.value} diam={diam} />
-
-          {/* Real coin photo overlay (circular crop with drop shadow) */}
-          {photoUri && !imgFailed && (
-            <Image
-              source={{ uri: photoUri }}
-              style={[styles.photo, {
-                width: diam, height: diam, borderRadius: diam / 2,
-              }]}
-              onError={() => setImgFailed(true)}
-              resizeMode="cover"
-            />
-          )}
-        </View>
+        <CoinSVG value={coin.value} />
       </Pressable>
     </Animated.View>
   );
@@ -320,10 +283,4 @@ export default function CoinButton({ coin, onPress }) {
 
 const styles = StyleSheet.create({
   pressable: { alignItems: 'center', justifyContent: 'center' },
-  photo: {
-    position: 'absolute', top: 0, left: 0,
-    shadowColor: '#000', shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 3 }, shadowRadius: 5,
-    elevation: 4,
-  },
 });
