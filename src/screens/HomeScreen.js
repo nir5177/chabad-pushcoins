@@ -86,7 +86,7 @@ export default function HomeScreen() {
     setTotal(t => Math.round((t + coin.value) * 10) / 10);
     setCoinCount(c => c + 1);
     // Play the uploaded MP3 for this denomination
-    audioRef.current?.playCoin({ value: coin.value });
+    audioRef.current?.playCoin();
     Haptics.impactAsync(
       coin.value >= 5  ? Haptics.ImpactFeedbackStyle.Heavy  :
       coin.value >= 1  ? Haptics.ImpactFeedbackStyle.Medium :
