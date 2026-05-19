@@ -50,11 +50,12 @@ export default function PaymentScreen({ visible, total, coinCount, onClose, onRe
   /* ── Bit deep-link ── */
   const openBit = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Try to open Bit directly — skip canOpenURL (unreliable on Android)
+    // Primary: Bit app deep link (Android intent-style)
     Linking.openURL(`bit://send?phone=${BIT_PHONE}&amount=${amount}`)
       .catch(() =>
-        // Bit not installed — fallback to WhatsApp
-        openWhatsApp()
+        // Secondary: Bit web universal link (opens Bit app via App Links if installed)
+        Linking.openURL(`https://bitpay.co.il/transfer?phone=${BIT_PHONE}&amount=${amount}`)
+          .catch(() => openWhatsApp())
       );
   }, [amount]);
 
