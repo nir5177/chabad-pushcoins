@@ -284,11 +284,10 @@ export default function CoinButton({ coin, onPress }) {
         hitSlop={10}
         style={styles.pressable}
       >
-        {/* Try photo first, SVG as fallback */}
         {COIN_PHOTOS[coin.value] ? (
           <Image
             source={COIN_PHOTOS[coin.value]}
-            style={{ width: diam, height: diam, borderRadius: diam / 2 }}
+            style={{ width: diam, height: diam }}
             resizeMode="contain"
           />
         ) : (
