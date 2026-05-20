@@ -107,10 +107,12 @@ export default function HomeScreen() {
     );
   }, []);
 
-  // PanResponder: overlay on carousel — captures downward drags, passes taps through
+  // PanResponder: overlay on carousel — capture phase wins vertical drags before FlatList
   const carouselPan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gs) =>
+    onStartShouldSetPanResponderCapture: () => false,
+    // capture phase: claim clearly-downward drags before FlatList can scroll
+    onMoveShouldSetPanResponderCapture: (_, gs) =>
       !insertingRef.current &&
       gs.dy > 8 &&
       Math.abs(gs.dy) > Math.abs(gs.dx) * 2,
@@ -198,7 +200,6 @@ export default function HomeScreen() {
             selIdxRef.current = index;
             setSelIdx(index);
             flatRef.current?.scrollToIndex({ index, animated: true });
-            insertCoin(coin);
           }}
         />
       </Animated.View>
