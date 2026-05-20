@@ -2,10 +2,9 @@ import React, { forwardRef, useImperativeHandle, useEffect, useRef } from 'react
 import { Audio } from 'expo-av';
 
 const SOURCES = [
-  require('../../assets/coin.mp3'),
-  require('../../assets/coin2.mp3'),
-  require('../../assets/coin3.mp3'),
-  require('../../assets/coin4.mp3'),
+  require('../../assets/coin_drop1.mp3'),
+  require('../../assets/coin_drop2.mp3'),
+  require('../../assets/coin_drop3.mp3'),
 ];
 
 const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
