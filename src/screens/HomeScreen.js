@@ -66,6 +66,7 @@ export default function HomeScreen() {
   const [showDonate, setShowDonate] = useState(false);
   const [dragging,   setDragging]   = useState(false);
   const [slotActive, setSlotActive] = useState(false);
+  const [showMiss,   setShowMiss]   = useState(false);
 
   // Scroll to initial position after mount
   useEffect(() => {
@@ -167,6 +168,8 @@ export default function HomeScreen() {
             });
         });
       } else {
+        setShowMiss(true);
+        setTimeout(() => setShowMiss(false), 1100);
         Animated.timing(dragScale, { toValue: 0, duration: 110, useNativeDriver: false })
           .start(() => { setDragging(false); dragScale.setValue(1); });
       }
@@ -204,7 +207,7 @@ export default function HomeScreen() {
         />
       </Animated.View>
     );
-  }, [scrollX, insertCoin]);
+  }, [scrollX]);
 
   const handleReset = useCallback(() => {
     Alert.alert('איפוס', 'לאפס את סכום הפושקה?', [
@@ -265,8 +268,11 @@ export default function HomeScreen() {
           <View style={StyleSheet.absoluteFill} {...carouselPan.panHandlers} />
         </View>
 
-        {/* Drag hint */}
-        <Text style={styles.dragHint}>↓  גרור מטבע אל חריץ הפושקה  ↓</Text>
+        {/* Drag hint / miss feedback */}
+        {showMiss
+          ? <Text style={styles.missHint}>↑  גרור עד לחריץ בראש הפושקה  ↑</Text>
+          : <Text style={styles.dragHint}>↓  גרור מטבע אל חריץ הפושקה  ↓</Text>
+        }
 
         {/* Pushka image */}
         <View ref={pushkaRef} style={styles.pushkaWrap} onLayout={measureAll}>
@@ -304,8 +310,9 @@ export default function HomeScreen() {
               {coinCount === 0 ? 'הכנס מטבע לפושקה' : `${coinCount} מטבע${coinCount === 1 ? '' : 'ות'}`}
             </Text>
           </View>
-          <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
+          <TouchableOpacity style={styles.resetBtn} onPress={handleReset} accessibilityLabel="אפס סכום">
             <Text style={styles.resetText}>↺</Text>
+            <Text style={styles.resetLabel}>איפוס</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.donateBtn, total === 0 && styles.donateBtnOff]}
@@ -365,6 +372,10 @@ const styles = StyleSheet.create({
     textAlign: 'center', color: INDIGO, fontSize: 12, fontWeight: '700',
     opacity: 0.55, marginVertical: 4,
   },
+  missHint: {
+    textAlign: 'center', color: '#c0392b', fontSize: 12, fontWeight: '700',
+    marginVertical: 4,
+  },
 
   pushkaWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
@@ -374,10 +385,10 @@ const styles = StyleSheet.create({
   totalLabel:  { fontSize: 11, color: MUTED },
 
   resetBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#e8e4f8', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
   },
-  resetText: { fontSize: 20, color: MUTED },
+  resetText:  { fontSize: 20, color: MUTED },
+  resetLabel: { fontSize: 9, color: MUTED, marginTop: -2 },
 
   donateBtn: {
     backgroundColor: INDIGO, paddingVertical: 12, paddingHorizontal: 16,

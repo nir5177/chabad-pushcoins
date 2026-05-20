@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Linking, Alert, Modal, Animated, Dimensions,
+  Linking, Alert, Modal, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -47,34 +47,30 @@ function PayMethod({ icon, title, subtitle, onPress, disabled, style }) {
 export default function PaymentScreen({ visible, total, coinCount, onClose, onReset }) {
   const amount = fmt(total);
 
-  /* ── Bit deep-link ── */
-  const openBit = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Android Intent URI — forces Bit app open even when canOpenURL returns false
-    const intentUrl =
-      `intent://send?phone=${BIT_PHONE}&amount=${amount}` +
-      `#Intent;scheme=bit;package=com.onyx.bit;end`;
-    Linking.openURL(intentUrl)
-      .catch(() =>
-        // Fallback: web link that Bit handles via App Links
-        Linking.openURL(`https://bit.co.il/transfer/${BIT_PHONE}?amount=${amount}`)
-          .catch(() => openWhatsApp())
-      );
-  }, [amount]);
-
   /* ── WhatsApp ── */
   const openWhatsApp = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const msg = `שלום! אני רוצה לתרום ${amount} ₪ לבית חב"ד קרית בורוכוב ותל גנים 🙏`;
     const encoded = encodeURIComponent(msg);
-    // Direct app scheme — opens WhatsApp without going through browser
     Linking.openURL(`whatsapp://send?phone=${BIT_PHONE_INT}&text=${encoded}`)
       .catch(() =>
-        // Fallback: universal link (opens browser → WhatsApp)
         Linking.openURL(`https://wa.me/${BIT_PHONE_INT}?text=${encoded}`)
           .catch(() => Alert.alert('שגיאה', 'לא ניתן לפתוח WhatsApp'))
       );
   }, [amount]);
+
+  /* ── Bit deep-link (defined after openWhatsApp so it can reference it) ── */
+  const openBit = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const intentUrl =
+      `intent://send?phone=${BIT_PHONE}&amount=${amount}` +
+      `#Intent;scheme=bit;package=com.onyx.bit;end`;
+    Linking.openURL(intentUrl)
+      .catch(() =>
+        Linking.openURL(`https://bit.co.il/transfer/${BIT_PHONE}?amount=${amount}`)
+          .catch(() => openWhatsApp())
+      );
+  }, [amount, openWhatsApp]);
 
   const handleReset = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -159,7 +155,7 @@ export default function PaymentScreen({ visible, total, coinCount, onClose, onRe
 
         {/* ── Reset ── */}
         <TouchableOpacity onPress={handleReset} style={styles.resetBtn}>
-          <Text style={styles.resetText}>אפס ופתח מחדש</Text>
+          <Text style={styles.resetText}>אפס את הפושקה</Text>
         </TouchableOpacity>
 
       </SafeAreaView>

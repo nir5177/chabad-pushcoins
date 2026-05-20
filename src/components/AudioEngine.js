@@ -11,17 +11,16 @@ const SOURCES = [
 const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
   const sounds  = useRef([]);
   const lastIdx = useRef(-1);
-  const busy    = useRef(false);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         await Audio.setAudioModeAsync({
-          allowsRecordingIOS:        false,
-          playsInSilentModeIOS:      true,
-          staysActiveInBackground:   false,
-          shouldDuckAndroid:         false,
+          allowsRecordingIOS:         false,
+          playsInSilentModeIOS:       true,
+          staysActiveInBackground:    false,
+          shouldDuckAndroid:          false,
           playThroughEarpieceAndroid: false,
         });
         const loaded = await Promise.all(
@@ -40,23 +39,19 @@ const AudioEngine = forwardRef(function AudioEngine(_props, ref) {
 
   useImperativeHandle(ref, () => ({
     async playCoin() {
-      if (busy.current || sounds.current.length === 0) return;
-      busy.current = true;
+      if (sounds.current.length === 0) return;
+      // Pick a different sound than last time (no busy flag — rapid drops each play)
+      let idx;
+      do { idx = Math.floor(Math.random() * sounds.current.length); }
+      while (idx === lastIdx.current && sounds.current.length > 1);
+      lastIdx.current = idx;
+      const s = sounds.current[idx];
       try {
-        // Pick a different sound than last time
-        let idx;
-        do { idx = Math.floor(Math.random() * sounds.current.length); }
-        while (idx === lastIdx.current && sounds.current.length > 1);
-        lastIdx.current = idx;
-
-        const s = sounds.current[idx];
-        // stop → rewind → play is the most reliable cross-platform sequence
         await s.stopAsync().catch(() => {});
         await s.setPositionAsync(0);
         await s.setVolumeAsync(1.0);
         await s.playAsync();
       } catch (_) {}
-      finally { busy.current = false; }
     },
   }));
 
