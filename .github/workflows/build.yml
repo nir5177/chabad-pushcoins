@@ -1,76 +1,164 @@
 name: Build PushCoins APK
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
-        with: {java-version: '17', distribution: 'temurin'}
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
       - uses: actions/setup-node@v4
-        with: {node-version: '20'}
-      - name: Assets
+        with:
+          node-version: '20'
+
+      - name: Generate assets
         run: |
           sudo apt-get install -y imagemagick ffmpeg --quiet
           mkdir -p assets/coins
-          for spec in "coin_half:#D4AF37:26" "coin_1:#B0B0B0:18" "coin_2:#B0B0B0:21" "coin_5:#B0B0B0:24" "coin_10:#C5A028:23"; do
-            IFS=':' read -r name color size <<< "$spec"
-            [ -f "assets/coins/${name}.png" ] && continue
-            px=$((size*4)); convert -size ${px}x${px} xc:none -fill "$color" -draw "circle $((px/2)),$((px/2)) $((px/2)),5" -fill white -font DejaVu-Sans-Bold -pointsize $((px/3)) -gravity center -annotate 0 "₪" assets/coins/${name}.png
+
+          for spec in "coin_half #D4AF37 26" "coin_1 #B0B0B0 18" "coin_2 #B0B0B0 21" "coin_5 #B0B0B0 24" "coin_10 #C5A028 23"; do
+            read -r name color size <<< "$spec"
+            if [ ! -f "assets/coins/${name}.png" ]; then
+              px=$((size*4))
+              convert -size ${px}x${px} xc:none \
+                -fill "$color" -draw "circle $((px/2)),$((px/2)) $((px/2)),5" \
+                -fill white -font DejaVu-Sans-Bold -pointsize $((px/3)) \
+                -gravity center -annotate 0 "NIS" \
+                assets/coins/${name}.png
+            fi
           done
-          [ ! -f assets/pushka.png ] && convert -size 400x500 xc:"#F5F0E8" -fill "#8B4513" -draw "roundrectangle 80,100 320,460 20,20" -fill white -font DejaVu-Sans-Bold -pointsize 60 -gravity center -annotate 0 "צדקה" assets/pushka.png
-          convert assets/pushka.png -resize 1024x1024 -background "#F5F0E8" -gravity center -extent 1024x1024 assets/icon.png
+
+          if [ ! -f assets/pushka.png ]; then
+            convert -size 400x500 xc:"#F5F0E8" \
+              -fill "#8B4513" -draw "roundrectangle 80,100 320,460 20,20" \
+              assets/pushka.png
+          fi
+
+          convert assets/pushka.png -resize 1024x1024 \
+            -background "#F5F0E8" -gravity center -extent 1024x1024 \
+            assets/icon.png
           cp assets/icon.png assets/adaptive-icon.png
-          python3 -c "
-import wave,struct,math,os
-def beep(p,f,d):
-  r=44100;n=int(r*d)
-  with wave.open(p,'w') as w:
-    w.setnchannels(1);w.setsampwidth(2);w.setframerate(r)
-    for i in range(n):
-      t=i/r;e=min(1.,t*20)*max(0.,1.-t/d);w.writeframes(struct.pack('<h',int(32767*.4*e*math.sin(2*math.pi*f*t))))
-os.makedirs('assets',exist_ok=True)
-beep('assets/coin.wav',1200,.20);beep('assets/coin2.wav',900,.25);beep('assets/coin3.wav',1050,.22);beep('assets/coin4.wav',750,.28)
-"
-          for i in 1 2 3 4; do ffmpeg -i assets/coin.wav assets/coin${i}.mp3 -y -loglevel quiet; done
+
+          python3 << 'PYEOF'
+          import wave, struct, math, os
+          def beep(path, freq, dur):
+              rate = 44100
+              frames = int(rate * dur)
+              with wave.open(path, 'w') as f:
+                  f.setnchannels(1)
+                  f.setsampwidth(2)
+                  f.setframerate(rate)
+                  for i in range(frames):
+                      t = i / rate
+                      env = min(1.0, t * 20) * max(0.0, 1.0 - t / dur)
+                      val = int(32767 * 0.4 * env * math.sin(2 * math.pi * freq * t))
+                      f.writeframes(struct.pack('<h', val))
+          os.makedirs('assets', exist_ok=True)
+          beep('assets/coin.wav',  1200, 0.20)
+          beep('assets/coin2.wav',  900, 0.25)
+          beep('assets/coin3.wav', 1050, 0.22)
+          beep('assets/coin4.wav',  750, 0.28)
+          PYEOF
+
+          for i in 1 2 3 4; do
+            ffmpeg -i assets/coin.wav assets/coin${i}.mp3 -y -loglevel quiet
+          done
           ffmpeg -i assets/coin.wav assets/coin.mp3 -y -loglevel quiet
+
       - run: npm install
+
       - run: npm install -g @expo/cli --silent
-      - name: Prebuild
-        env: {EXPO_NO_TELEMETRY: '1'}
+
+      - name: Expo prebuild
+        env:
+          EXPO_NO_TELEMETRY: '1'
         run: |
-          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('app.json'));delete c.expo.extra;fs.writeFileSync('app.json',JSON.stringify(c,null,2));"
+          node -e "
+            const fs = require('fs');
+            const cfg = JSON.parse(fs.readFileSync('app.json'));
+            delete cfg.expo.extra;
+            fs.writeFileSync('app.json', JSON.stringify(cfg, null, 2));
+          "
           npx expo prebuild --platform android --clean --no-install
+
       - uses: android-actions/setup-android@v3
-        with: {packages: 'platforms;android-34 build-tools;34.0.0', accept-android-sdk-licenses: true}
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0'
+          accept-android-sdk-licenses: true
+
       - name: Keystore
-        run: keytool -genkeypair -keystore /tmp/k.keystore -alias pushcoins -keyalg RSA -keysize 2048 -validity 10000 -storepass PushCoins2024! -keypass PushCoins2024! -dname "CN=Chabad PushCoins,O=Chabad,C=IL" -noprompt
-      - name: Sign
+        run: |
+          keytool -genkeypair \
+            -keystore /tmp/k.keystore \
+            -alias pushcoins \
+            -keyalg RSA -keysize 2048 \
+            -validity 10000 \
+            -storepass PushCoins2024! \
+            -keypass PushCoins2024! \
+            -dname "CN=Chabad PushCoins,O=Chabad,C=IL" \
+            -noprompt
+
+      - name: Configure signing
         working-directory: android
-        run: printf '\nandroid.signingConfigs{pushcoinsRelease{storeFile file("/tmp/k.keystore");storePassword "PushCoins2024!";keyAlias "pushcoins";keyPassword "PushCoins2024!"}}\nandroid.buildTypes.release.signingConfig=android.signingConfigs.pushcoinsRelease\n' >> app/build.gradle
-      - name: Build
+        run: |
+          cat >> app/build.gradle << 'GRADLE'
+
+          android.signingConfigs {
+              release2 {
+                  storeFile file('/tmp/k.keystore')
+                  storePassword 'PushCoins2024!'
+                  keyAlias 'pushcoins'
+                  keyPassword 'PushCoins2024!'
+              }
+          }
+          android.buildTypes.release.signingConfig = android.signingConfigs.release2
+          GRADLE
+
+      - name: Build APK
         working-directory: android
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs="-Xmx4g"
+          ./gradlew assembleRelease \
+            -Dorg.gradle.daemon=false \
+            -Dorg.gradle.jvmargs="-Xmx4g"
+
       - name: Find APK
         id: apk
         run: |
+          set -euo pipefail
           APK=$(find android -name "*.apk" -path "*/release/*" | head -1)
-          [ -z "$APK" ] && exit 1
+          if [ -z "$APK" ]; then
+            find android/app/build/outputs/ 2>/dev/null || true
+            exit 1
+          fi
           echo "path=$APK" >> $GITHUB_OUTPUT
+          echo "APK: $APK"
+
       - uses: actions/upload-artifact@v4
-        with: {name: PushCoins-APK, path: "${{ steps.apk.outputs.path }}", retention-days: 30}
+        with:
+          name: PushCoins-APK
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: "PushCoins Chabad — Build ${{ github.run_number }}"
-          body: "Drag-and-drop Israeli coins into the pushka. Donate via Bit/PayBox to 0508100010."
+          name: "PushCoins Chabad - Build ${{ github.run_number }}"
+          body: |
+            Drag-and-drop Israeli NIS coins into the pushka.
+            Donate via Bit or PayBox to 0508100010.
           files: ${{ steps.apk.outputs.path }}
           fail_on_unmatched_files: true
